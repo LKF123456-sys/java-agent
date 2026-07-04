@@ -35,8 +35,7 @@ public class AgentService {
                         请主动使用工具获取真实信息，而不是凭空猜测。
                         思考步骤：先了解目的地天气 -> 制定行程 -> 估算费用 -> 给出建议
                         """)
-                // defaultTools 替代已废弃的 defaultFunctions，注册 Bean 名称
-                .defaultTools("weatherTool", "calculatorTool")
+                .defaultFunctions("weatherTool", "calculatorTool")
                 .defaultAdvisors(new MessageChatMemoryAdvisor(new InMemoryChatMemory()))
                 .build();
     }

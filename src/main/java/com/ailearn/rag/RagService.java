@@ -49,7 +49,7 @@ public class RagService {
                         """)
                 // QuestionAnswerAdvisor 自动完成检索+注入
                 .defaultAdvisors(new QuestionAnswerAdvisor(vectorStore,
-                        SearchRequest.defaults().withTopK(5)))  // 检索最相关的5个片段
+                        SearchRequest.builder().topK(5).build()))  // 检索最相关的5个片段
                 .build();
     }
 

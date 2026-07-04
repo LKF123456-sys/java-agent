@@ -37,9 +37,11 @@ public class MemoryChatService {
     public String chat(String conversationId, String userMessage) {
         return chatClient.prompt()
                 .user(userMessage)
-                // 通过 advisorParam 传入会话ID和历史消息数量上限
-                .advisorParam(CHAT_MEMORY_CONVERSATION_ID_KEY, conversationId)
-                .advisorParam(CHAT_MEMORY_RETRIEVE_SIZE_KEY, 20)  // 最多携带20条历史
+                // 通过 advisor 的 param 方法传入会话ID和历史消息数量上限
+                .advisors(a -> a
+                        .param(CHAT_MEMORY_CONVERSATION_ID_KEY, conversationId)
+                        .param(CHAT_MEMORY_RETRIEVE_SIZE_KEY, 20))
+
                 .call()
                 .content();
     }
