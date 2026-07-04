@@ -1,0 +1,113 @@
+# ============================================================
+# 单元测试配置文件 - 使用H2内存数据库
+# 测试时激活此配置：@ActiveProfiles("test")
+# 此配置完全独立于外部服务，无需MySQL/Ollama/PostgreSQL
+# ============================================================
+
+spring:
+  application:
+    name: cyber-ai-platform-test
+
+  # ==================== 数据源配置：使用H2内存数据库 ====================
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=MySQL
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 1
+
+  # H2控制台（测试时可访问，方便调试）
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+  # JPA配置：自动创建表结构（H2环境）
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    database-platform: org.hibernate.dialect.H2Dialect
+
+  # SQL初始化：使用测试专用schema
+  sql:
+    init:
+      mode: always
+      continue-on-error: true
+      encoding: UTF-8
+
+  # ==================== 禁用Spring AI自动配置（测试不依赖Ollama） ====================
+  autoconfigure:
+    exclude:
+      - org.springframework.ai.autoconfigure.ollama.OllamaAutoConfiguration
+      - org.springframework.ai.vectorstore.pgvector.autoconfigure.PgVectorStoreAutoConfiguration
+      - org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration
+      - org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
+
+# ==================== MyBatis-Plus配置 ====================
+mybatis-plus:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.ailearn.entity
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.nologging.NoLoggingImpl
+  global-config:
+    db-config:
+      id-type: auto
+    banner: false
+
+# ==================== JWT配置（测试用固定密钥） ====================
+jwt:
+  secret: test-jwt-secret-key-for-unit-testing-only-please-do-not-use-in-production-0123456789
+  access-token-expiration: 3600000
+  refresh-token-expiration: 86400000
+  token-prefix: Bearer
+  header: Authorization
+
+# ==================== 禁用限流和熔断（单元测试不需要） ====================
+resilience4j:
+  ratelimiter:
+    configs:
+      default:
+        limit-for-period: 1000
+        limit-refresh-period: 1s
+        timeout-duration: 0s
+  circuitbreaker:
+    configs:
+      default:
+        sliding-window-size: 100
+        failure-rate-threshold: 100
+
+# ==================== 关闭API文档（测试不需要） ====================
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+# ==================== Actuator配置 ====================
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
+
+# ==================== 日志配置（测试时只显示WARN及以上级别） ====================
+logging:
+  level:
+    root: WARN
+    com.ailearn: INFO
+    org.springframework: WARN
+    org.springframework.test: INFO
+    org.hibernate: WARN
+    com.baomidou.mybatisplus: WARN
+
+# ==================== 禁用Spring Security（单元测试单独测试安全组件） ====================
+security:
+  basic:
+    enabled: false

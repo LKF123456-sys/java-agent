@@ -1,38 +1,268 @@
+# ========================================================
+# 赛博AI平台 - 生产级应用配置文件
+# 环境优先级：环境变量 > application.yml > 默认值
+# Docker部署请使用 -Dspring.profiles.active=docker 激活docker profile
+# ========================================================
+
 server:
-  port: 8080
+  # 服务端口（可通过环境变量SERVER_PORT覆盖）
+  port: ${SERVER_PORT:8080}
+  # Tomcat线程池调优
+  tomcat:
+    threads:
+      max: 200
+      min-spare: 10
+    # 请求体大小上限
+    max-http-form-post-size: 50MB
+    # 连接超时
+    connection-timeout: 30000
 
 spring:
   application:
-    name: java-ai-learn
-  autoconfigure:
-    exclude:
-      - org.springframework.ai.autoconfigure.transformers.TransformersEmbeddingModelAutoConfiguration
-      - org.springframework.ai.autoconfigure.openai.OpenAiAutoConfiguration
+    name: cyber-ai-platform
 
+  # ==================== 数据源配置（默认：本地MySQL） ====================
+  # 使用HikariCP连接池（Spring Boot默认）
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/ai_learn?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true}
+    username: ${SPRING_DATASOURCE_USERNAME:root}
+    password: ${SPRING_DATASOURCE_PASSWORD:root}
+    driver-class-name: ${SPRING_DATASOURCE_DRIVER:com.mysql.cj.jdbc.Driver}
+    hikari:
+      # 连接池大小配置
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      # 连接测试查询
+      connection-test-query: SELECT 1
+
+  # 文件上传配置
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 100MB
+      enabled: true
+
+  # SQL初始化：自动建表
+  sql:
+    init:
+      mode: always
+      continue-on-error: true
+      encoding: UTF-8
+
+  # ==================== Spring AI 配置 ====================
   ai:
-    # ====================================================
-    # Ollama 配置（本地模型，无需 API key）
-    # 需先安装 Ollama: https://ollama.ai
-    # ====================================================
+    # Ollama本地模型配置
     ollama:
       chat:
         enabled: true
         options:
-          model: qwen2.5:7b      # 推荐中文模型
+          model: ${OLLAMA_CHAT_MODEL:qwen2.5:7b}
           temperature: 0.7
+          # 最大Token数
+          num-ctx: 8192
       embedding:
         enabled: true
         options:
-          model: nomic-embed-text  # Ollama Embedding 模型
-      base-url: http://localhost:11434
+          model: ${OLLAMA_EMBEDDING_MODEL:nomic-embed-text}
+      base-url: ${SPRING_AI_OLLAMA_BASE_URL:http://localhost:11434}
 
+    # MCP服务器配置（Model Context Protocol）
+    mcp:
+      server:
+        name: cyber-ai-platform
+        version: 1.0.0
+        type: SYNC
+        sse-message-endpoint: /mcp/message
+
+  # 默认禁用PgVector自动配置（由AiConfig根据数据源类型手动控制）
+  autoconfigure:
+    exclude:
+      - org.springframework.ai.vectorstore.pgvector.autoconfigure.PgVectorStoreAutoConfiguration
+
+# ==================== MyBatis-Plus配置 ====================
+mybatis-plus:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.ailearn.entity
+  configuration:
+    # 驼峰命名映射
+    map-underscore-to-camel-case: true
+    # SQL日志（开发环境开启，生产环境建议关闭）
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      id-type: auto
+      # 逻辑删除字段
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+    banner: false
+
+# ==================== JWT配置 ====================
+jwt:
+  # JWT签名密钥（生产环境必须通过环境变量JWT_SECRET设置！）
+  secret: ${JWT_SECRET:cyber-ai-platform-secret-key-for-jwt-token-generation-please-change-in-production}
+  # Access Token过期时间：默认2小时（毫秒）
+  access-token-expiration: ${JWT_ACCESS_EXPIRATION:7200000}
+  # Refresh Token过期时间：默认7天（毫秒）
+  refresh-token-expiration: ${JWT_REFRESH_EXPIRATION:604800000}
+  # Token前缀
+  token-prefix: Bearer
+  # Header名称
+  header: Authorization
+
+# ==================== Resilience4j限流配置 ====================
+# 基于令牌桶算法的接口限流保护，防止AI接口被恶意调用打满资源
+# 使用@RateLimiter(name = "xxx")注解在Service方法上启用限流
+resilience4j:
+  ratelimiter:
+    configs:
+      default:
+        # 默认限流配置：10次/秒
+        limit-for-period: 10
+        limit-refresh-period: 1s
+        timeout-duration: 0s
+        register-health-indicator: true
+        # 限流拒绝事件处理
+        event-consumer-buffer-size: 100
+    instances:
+      # 聊天服务限流：10次/10秒（普通对话，限制较为宽松）
+      chatService:
+        limit-for-period: 10
+        limit-refresh-period: 10s
+        timeout-duration: 0s
+      # 记忆对话限流：同聊天服务
+      memoryChatService:
+        limit-for-period: 10
+        limit-refresh-period: 10s
+        timeout-duration: 0s
+      # Agent智能体服务限流：3次/30秒（Agent推理消耗大量Token，限制严格）
+      agentService:
+        limit-for-period: 3
+        limit-refresh-period: 30s
+        timeout-duration: 0s
+      # RAG知识库服务限流：5次/分钟（涉及向量检索+文档处理）
+      ragService:
+        limit-for-period: 5
+        limit-refresh-period: 60s
+        timeout-duration: 0s
+  # 熔断降级配置
+  circuitbreaker:
+    configs:
+      default:
+        sliding-window-size: 10
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 3
+    instances:
+      aiService:
+        base-config: default
+
+# ==================== SpringDoc OpenAPI/Swagger配置 ====================
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+    enabled: ${SPRINGDOC_ENABLED:true}
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: ${SWAGGER_ENABLED:true}
+    tags-sorter: alpha
+    operations-sorter: alpha
+    # 不折叠Model
+    doc-expansion: none
+  packages-to-scan: com.ailearn
+  # 不扫描的路径
+  paths-to-exclude: /actuator/**, /mcp/**
+
+# ==================== Actuator监控端点配置 ====================
 management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,mcp,metrics
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: when-authorized
+  info:
+    env:
+      enabled: true
+    build:
+      enabled: true
 
+# ==================== 日志配置 ====================
 logging:
   level:
-    org.springframework.ai: DEBUG   # 开启 Spring AI 日志，方便学习调试
-    com.ailearn: DEBUG
+    # Spring AI框架日志（INFO级别减少噪音）
+    org.springframework.ai: INFO
+    # 本项目日志（开发DEBUG，生产建议INFO）
+    com.ailearn: ${LOG_LEVEL:DEBUG}
+    # Spring Security（调试时可开启DEBUG）
+    org.springframework.security: WARN
+    # MyBatis日志
+    org.apache.ibatis: WARN
+    # Resilience4j限流日志
+    io.github.resilience4j: INFO
+  pattern:
+    # 控制台日志格式（包含traceId）
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [%X{traceId:-}] %-5level %logger{50} - %msg%n"
+
+# ==================== 应用自定义信息（Actuator info端点） ====================
+info:
+  app:
+    name: Cyber AI Platform
+    description: 赛博AI平台 - 基于Spring AI的企业级AI应用平台
+    version: 0.3.0
+  features:
+    - 多Agent协作
+    - MCP协议支持
+    - RAG知识库
+    - JWT认证
+    - PgVector向量存储
+    - Token级流式响应
+
+# ========================================================
+# Docker Profile：容器化部署配置
+# 激活方式：-Dspring.profiles.active=docker 或 环境变量SPRING_PROFILES_ACTIVE=docker
+# ========================================================
+---
+spring:
+  config:
+    activate:
+      on-profile: docker
+
+  # 生产环境使用PostgreSQL + PgVector
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://postgres:5432/ai_learn}
+    username: ${SPRING_DATASOURCE_USERNAME:postgres}
+    password: ${SPRING_DATASOURCE_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 30
+      minimum-idle: 10
+
+  # Docker环境Ollama地址
+  ai:
+    ollama:
+      base-url: ${SPRING_AI_OLLAMA_BASE_URL:http://ollama:11434}
+
+# Docker环境JWT密钥必须从环境变量传入
+jwt:
+  secret: ${JWT_SECRET}
+  access-token-expiration: ${JWT_ACCESS_EXPIRATION:7200000}
+  refresh-token-expiration: ${JWT_REFRESH_EXPIRATION:604800000}
+
+# 生产环境日志级别
+logging:
+  level:
+    com.ailearn: INFO
+    org.springframework.ai: WARN
+
+# 生产环境关闭Swagger（安全考虑，可按需开启）
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false

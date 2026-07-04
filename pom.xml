@@ -4,25 +4,36 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
+    <!-- ==================== 父POM：Spring Boot 3.4.7（最新稳定版） ==================== -->
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.4.3</version>
+        <version>3.4.7</version>
         <relativePath/>
     </parent>
 
+    <!-- ==================== 项目坐标 ==================== -->
     <groupId>com.ailearn</groupId>
     <artifactId>javaAILearn</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
-    <name>javaAILearn</name>
-    <description>Spring AI 学习项目 - 从基础聊天到 Agent/MCP</description>
+    <version>0.0.3-SNAPSHOT</version>
+    <name>Cyber AI Platform</name>
+    <description>赛博AI平台 - 生产级Spring AI企业级应用，支持多Agent协作、MCP协议、RAG知识库、JWT认证、PgVector向量存储</description>
 
+    <!-- ==================== 版本属性管理 ==================== -->
     <properties>
         <java.version>21</java.version>
-        <spring-ai.version>1.0.0-M6</spring-ai.version>
+        <spring-ai.version>1.0.0</spring-ai.version>
+        <jjwt.version>0.12.6</jjwt.version>
+        <springdoc.version>2.8.6</springdoc.version>
+        <resilience4j.version>2.2.0</resilience4j.version>
+        <tess4j.version>5.13.0</tess4j.version>
+        <hutool.version>5.8.38</hutool.version>
+        <maven.compiler.source>21</maven.compiler.source>
+        <maven.compiler.target>21</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
-    <!-- Spring AI BOM 统一管理版本 -->
+    <!-- ==================== Spring AI BOM：统一管理AI相关依赖版本 ==================== -->
     <dependencyManagement>
         <dependencies>
             <dependency>
@@ -35,69 +46,219 @@
         </dependencies>
     </dependencyManagement>
 
+    <!-- ==================== 依赖声明 ==================== -->
     <dependencies>
-        <!-- Web -->
+
+        <!-- ========== Spring Boot Web核心 ========== -->
+        <!-- Spring MVC Web支持，提供REST API能力 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
 
-        <!-- Spring AI - OpenAI（支持 ChatGPT / DeepSeek / 其他兼容 API） -->
+        <!-- WebFlux响应式支持，SSE流式响应和Reactor类型依赖 -->
         <dependency>
-            <groupId>org.springframework.ai</groupId>
-            <artifactId>spring-ai-openai-spring-boot-starter</artifactId>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webflux</artifactId>
         </dependency>
 
-        <!-- Spring AI - Ollama（本地模型，可选） -->
+        <!-- ========== 安全认证 ========== -->
+        <!-- Spring Security安全框架，提供认证授权基础能力 -->
         <dependency>
-            <groupId>org.springframework.ai</groupId>
-            <artifactId>spring-ai-ollama-spring-boot-starter</artifactId>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
 
-        <!-- Spring AI - 向量数据库：简单内存实现，用于 RAG 学习 -->
+        <!-- JSR380参数校验（@Valid/@NotNull等注解） -->
         <dependency>
-            <groupId>org.springframework.ai</groupId>
-            <artifactId>spring-ai-transformers-spring-boot-starter</artifactId>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
 
-        <!-- Lombok 减少样板代码 -->
+        <!-- JJWT：JWT令牌生成与验证 -->
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-api</artifactId>
+            <version>${jjwt.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-impl</artifactId>
+            <version>${jjwt.version}</version>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-jackson</artifactId>
+            <version>${jjwt.version}</version>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- ========== Spring AI核心依赖 ========== -->
+        <!-- Ollama本地模型接入（聊天+嵌入） -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-starter-model-ollama</artifactId>
+        </dependency>
+
+        <!-- 向量存储抽象层 -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-vector-store</artifactId>
+        </dependency>
+
+        <!-- VectorStore Advisor：RAG检索增强顾问 -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-advisors-vector-store</artifactId>
+        </dependency>
+
+        <!-- PgVector：PostgreSQL向量扩展存储 -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-starter-vector-store-pgvector</artifactId>
+        </dependency>
+
+        <!-- MCP Server：Model Context Protocol服务端（WebMVC模式） -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-starter-mcp-server-webmvc</artifactId>
+        </dependency>
+
+        <!-- PDF文档读取器（基于Apache PDFBox） -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-pdf-document-reader</artifactId>
+        </dependency>
+
+        <!-- Tika文档读取器：支持Word/Excel/PPT/HTML等多种格式 -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-tika-document-reader</artifactId>
+        </dependency>
+
+        <!-- ========== 数据库与ORM ========== -->
+        <!-- MySQL驱动 -->
+        <dependency>
+            <groupId>com.mysql</groupId>
+            <artifactId>mysql-connector-j</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- PostgreSQL驱动（PgVector需要） -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- MyBatis-Plus：增强版MyBatis ORM框架（Spring Boot 3适配版） -->
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
+            <version>3.5.9</version>
+        </dependency>
+
+        <!-- MyBatis-Plus JSqlParser扩展：提供分页插件PaginationInnerInterceptor等JSqlParser依赖的拦截器
+             MyBatis-Plus 3.5.6+将分页、防全表更新等功能拆分为独立模块，需显式引入 -->
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-jsqlparser</artifactId>
+            <version>3.5.9</version>
+        </dependency>
+
+        <!-- ========== 监控与运维 ========== -->
+        <!-- Spring Boot Actuator：应用健康检查与指标端点 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
+        <!-- ========== API文档 ========== -->
+        <!-- springdoc-openapi：自动生成OpenAPI 3.0/Swagger文档 -->
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <version>${springdoc.version}</version>
+        </dependency>
+
+        <!-- ========== 熔断限流（Resilience4j） ========== -->
+        <!-- Resilience4j核心：限流、熔断、重试 -->
+        <dependency>
+            <groupId>io.github.resilience4j</groupId>
+            <artifactId>resilience4j-spring-boot3</artifactId>
+            <version>${resilience4j.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.github.resilience4j</groupId>
+            <artifactId>resilience4j-ratelimiter</artifactId>
+            <version>${resilience4j.version}</version>
+        </dependency>
+
+        <!-- ========== OCR支持 ========== -->
+        <!-- Tess4J：Tesseract OCR的Java封装，支持扫描件图片文字识别 -->
+        <dependency>
+            <groupId>net.sourceforge.tess4j</groupId>
+            <artifactId>tess4j</artifactId>
+            <version>${tess4j.version}</version>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- ========== 工具库 ========== -->
+        <!-- Lombok：自动生成getter/setter/构造函数等样板代码 -->
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
             <optional>true</optional>
         </dependency>
 
-        <!-- Actuator 健康检查 -->
+        <!-- Hutool：Java工具类库，提供丰富的常用工具方法 -->
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-actuator</artifactId>
+            <groupId>cn.hutool</groupId>
+            <artifactId>hutool-all</artifactId>
+            <version>${hutool.version}</version>
         </dependency>
 
+        <!-- ========== 测试依赖 ========== -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.projectreactor</groupId>
+            <artifactId>reactor-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- H2内存数据库：用于单元测试，无需外部数据库依赖 -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
-    <!-- Spring AI Milestone 仓库 -->
-    <repositories>
-        <repository>
-            <id>spring-milestones</id>
-            <name>Spring Milestones</name>
-            <url>https://repo.spring.io/milestone</url>
-            <snapshots>
-                <enabled>false</enabled>
-            </snapshots>
-        </repository>
-    </repositories>
-
+    <!-- ==================== 构建配置 ==================== -->
     <build>
+        <finalName>cyber-ai-platform</finalName>
         <plugins>
+            <!-- Maven编译器插件：确保Lombok注解处理器正常工作 -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <configuration>
+                    <source>${java.version}</source>
+                    <target>${java.version}</target>
+                    <encoding>UTF-8</encoding>
+                    <!-- 编译参数：保留方法参数名（Spring Security/JWT反射需要） -->
+                    <compilerArgs>
+                        <arg>-parameters</arg>
+                    </compilerArgs>
                     <annotationProcessorPaths>
                         <path>
                             <groupId>org.projectlombok</groupId>
@@ -107,11 +268,14 @@
                     </annotationProcessorPaths>
                 </configuration>
             </plugin>
+
+            <!-- Spring Boot Maven插件：可执行JAR打包 -->
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <configuration>
                     <excludes>
+                        <!-- 打包时排除Lombok（运行时不需要） -->
                         <exclude>
                             <groupId>org.projectlombok</groupId>
                             <artifactId>lombok</artifactId>

@@ -1,21 +1,48 @@
 package com.ailearn;
 
+import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 /**
- * Spring AI 学习项目入口
+ * 赛博AI平台（Cyber AI Platform）启动类
+ * 基于Spring Boot 3.4.7和Spring AI 1.0.0构建的生产级AI应用平台
  *
- * 学习路径：
- * 1. chat      - 基础聊天（SimpleChat、流式输出）
- * 2. memory    - 多轮对话（会话记忆）
- * 3. structured - 结构化输出（BeanOutputConverter）
- * 4. tools     - Function Calling / 工具调用
- * 5. rag       - 检索增强生成（RAG）
- * 6. agent     - Agent 模式（ReAct、自主决策）
+ * <p>平台核心功能模块：
+ * <ul>
+ *   <li><b>用户认证</b>：JWT双Token认证机制，支持注册、登录、Token刷新</li>
+ *   <li><b>智能聊天</b>：基础AI对话，支持同步和SSE流式输出</li>
+ *   <li><b>记忆对话</b>：带持久化记忆的多轮对话，自动保存对话历史</li>
+ *   <li><b>智能体（Agent）</b>：单Agent工具调用，支持天气查询、数学计算</li>
+ *   <li><b>多智能体协作</b>：Planner/Researcher/Coder/Critic/Executor多Agent协作完成复杂任务</li>
+ *   <li><b>RAG知识库</b>：文档上传、向量存储、检索增强问答，支持PDF/Word/Excel/PPT/图片OCR等多种格式</li>
+ *   <li><b>结构化输出</b>：从非结构化文本中提取图书、电影等结构化信息</li>
+ *   <li><b>MCP协议</b>：支持Model Context Protocol，暴露工具供MCP客户端调用</li>
+ * </ul>
+ *
+ * <p>技术栈：
+ * <ul>
+ *   <li>Spring Boot 3.4.7 + Spring Security + Spring Validation</li>
+ *   <li>Spring AI 1.0.0 + Ollama本地模型</li>
+ *   <li>MyBatis-Plus 3.5.9 + MySQL/PostgreSQL(PgVector)</li>
+ *   <li>Springdoc OpenAPI 2.8.6（Swagger文档）</li>
+ *   <li>Resilience4j（限流熔断）</li>
+ *   <li>JJWT 0.12.6（JWT令牌）</li>
+ * </ul>
+ *
+ * @author AiLearn Platform
+ * @version 0.0.3-SNAPSHOT
  */
 @SpringBootApplication
+@MapperScan("com.ailearn.mapper")
 public class AiLearnApplication {
+
+    /**
+     * 应用程序入口方法
+     * 启动Spring Boot应用，初始化Spring应用上下文，自动配置所有组件
+     *
+     * @param args 命令行启动参数
+     */
     public static void main(String[] args) {
         SpringApplication.run(AiLearnApplication.class, args);
     }
