@@ -1,8 +1,11 @@
 <template>
-  <router-view />
+  <CyberLayout>
+    <router-view />
+  </CyberLayout>
 </template>
 
 <script setup>
+import CyberLayout from '@/components/CyberLayout.vue'
 </script>
 
 <style>

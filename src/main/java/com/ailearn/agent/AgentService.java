@@ -7,13 +7,12 @@ import com.ailearn.entity.Conversation;
 import com.ailearn.memory.DatabaseChatMemory;
 import com.ailearn.security.UserPrincipal;
 import com.ailearn.service.ConversationService;
-import com.ailearn.tools.CalculatorTool;
-import com.ailearn.tools.WeatherTool;
 import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
 import org.springframework.ai.chat.memory.ChatMemory;
+import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import reactor.core.publisher.Flux;
@@ -38,36 +37,15 @@ import reactor.core.publisher.Flux;
 @RateLimiter(name = "agentService")
 public class AgentService {
 
-    /**
-     * Agent专用ChatClient实例
-     * 通过Builder模式构建，预配置了系统提示词、工具函数和记忆顾问
-     */
     private final ChatClient agentClient;
 
-    /**
-     * 会话服务
-     * 用于会话创建、查询和消息持久化操作
-     */
     private final ConversationService conversationService;
 
-    /**
-     * 构造方法：初始化Agent专用ChatClient
-     * 通过Spring依赖注入获取ChatClient.Builder、聊天记忆和工具实例，
-     * 构建预配置了系统提示词、工具和记忆能力的Agent ChatClient。
-     *
-     * @param builder             ChatClient构建器，由Spring AI自动配置注入
-     * @param chatMemory          数据库聊天记忆实现，用于持久化对话历史
-     * @param weatherTool         天气查询工具，供Agent调用获取实时天气信息
-     * @param calculatorTool      数学计算工具，供Agent调用执行精确计算
-     * @param conversationService 会话服务，用于会话和消息的持久化
-     */
-    public AgentService(ChatClient.Builder builder,
+    public AgentService(ChatModel chatModel,
                         DatabaseChatMemory chatMemory,
-                        WeatherTool weatherTool,
-                        CalculatorTool calculatorTool,
                         ConversationService conversationService) {
         this.conversationService = conversationService;
-        this.agentClient = builder
+        this.agentClient = ChatClient.builder(chatModel)
                 .defaultSystem("""
                         你是一个专业的AI助手，具有以下能力：
                         1. 查询各城市天气信息（使用天气工具）
@@ -77,10 +55,9 @@ public class AgentService {
                         请主动使用工具获取真实信息，而不是凭空猜测。
                         思考步骤：分析问题 → 判断是否需要工具 → 调用工具 → 综合回答
                         """)
-                .defaultTools(weatherTool, calculatorTool)
                 .defaultAdvisors(MessageChatMemoryAdvisor.builder(chatMemory).build())
                 .build();
-        log.info("AgentService初始化完成，已注册工具：WeatherTool, CalculatorTool");
+        log.info("AgentService初始化完成");
     }
 
     /**
@@ -229,6 +206,11 @@ public class AgentService {
                 })
                 .doOnError(e -> {
                     log.error("Agent流式调用失败: conversationId={}, error={}", finalConversationId, e.getMessage(), e);
+                })
+                .onErrorResume(e -> {
+                    String errMsg = e.getMessage() != null ? e.getMessage() : "Agent调用失败";
+                    log.warn("Agent流异常，发送错误消息: {}", errMsg);
+                    return Flux.just("[ERROR] " + errMsg);
                 });
     }
 

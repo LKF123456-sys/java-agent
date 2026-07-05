@@ -1,5 +1,4 @@
 <template>
-  <CyberLayout>
     <div class="rag-view">
       <div class="page-header">
         <div class="header-decoration left"></div>
@@ -181,12 +180,10 @@
         </div>
       </div>
     </div>
-  </CyberLayout>
 </template>
 
 <script setup>
 import { ref, nextTick, watch } from 'vue'
-import CyberLayout from '@/components/CyberLayout.vue'
 import { get, post, del } from '@/utils/request'
 
 const allowedExtensions = ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.html', '.htm', '.md', '.txt', '.ppt', '.pptx']

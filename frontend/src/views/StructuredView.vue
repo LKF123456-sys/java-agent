@@ -1,5 +1,4 @@
 <template>
-  <CyberLayout>
     <div class="structured-view">
       <div class="page-header">
         <div class="header-decoration left"></div>
@@ -199,12 +198,10 @@
         </div>
       </div>
     </div>
-  </CyberLayout>
 </template>
 
 <script setup>
 import { ref, computed } from 'vue'
-import CyberLayout from '@/components/CyberLayout.vue'
 import { get } from '@/utils/request'
 
 const bookTitle = ref('')

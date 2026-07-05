@@ -1,5 +1,4 @@
 <template>
-  <CyberLayout>
     <div class="multi-agent-view">
       <div class="page-header">
         <div class="header-decoration left"></div>
@@ -130,12 +129,10 @@
         </div>
       </div>
     </div>
-  </CyberLayout>
 </template>
 
 <script setup>
 import { ref, nextTick, onUnmounted } from 'vue'
-import CyberLayout from '@/components/CyberLayout.vue'
 import { createSSEConnection } from '@/utils/request'
 
 const taskGoal = ref('')
@@ -211,8 +208,21 @@ const handleCollaborate = async () => {
   
   const url = `/api/multi-agent/stream?task=${encodeURIComponent(taskGoal.value.trim())}`
 
+  let hasError = false
+
   sseConnection = createSSEConnection(url, {
     onMessage: (data) => {
+      if (!data) return
+
+      if (data.startsWith('[ERROR]')) {
+        hasError = true
+        errorMsg.value = '错误: ' + data.substring(7)
+        collaborating.value = false
+        isCompleted.value = true
+        closeSSE()
+        return
+      }
+
       try {
         const parsed = JSON.parse(data)
         
@@ -260,17 +270,31 @@ const handleCollaborate = async () => {
           scrollToBottom()
           return
         }
+
+        if (parsed.type === 'error') {
+          hasError = true
+          errorMsg.value = parsed.content || '协作失败，请重试'
+          collaborating.value = false
+          isCompleted.value = true
+          closeSSE()
+          return
+        }
       } catch (e) {
-        console.error('解析SSE消息失败:', e, data)
+        console.debug('非JSON消息，忽略:', data.substring(0, 50))
       }
     },
     onError: (error) => {
-      closeSSE()
-      collaborating.value = false
-      isCompleted.value = true
-      if (messages.value.length === 0) {
-        errorMsg.value = '协作失败，请重试'
+      if (!hasError) {
+        collaborating.value = false
+        isCompleted.value = true
+        if (messages.value.length === 0) {
+          errorMsg.value = '连接失败，请检查后端服务是否启动'
+        }
       }
+      closeSSE()
+    },
+    onClose: () => {
+      collaborating.value = false
     }
   })
 }

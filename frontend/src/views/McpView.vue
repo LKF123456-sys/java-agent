@@ -1,5 +1,4 @@
 <template>
-  <CyberLayout>
     <div class="mcp-view">
       <div class="page-header">
         <div class="header-decoration left"></div>
@@ -172,12 +171,10 @@
         </div>
       </div>
     </div>
-  </CyberLayout>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import CyberLayout from '@/components/CyberLayout.vue'
 import { post } from '@/utils/request'
 
 const sseUrl = ref(window.location.origin + '/sse')

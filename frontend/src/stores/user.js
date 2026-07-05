@@ -9,7 +9,7 @@ export const useUserStore = defineStore('user', () => {
   const user = ref(null)
   const accessToken = ref(localStorage.getItem(ACCESS_TOKEN_KEY) || '')
 
-  const isLoggedIn = computed(() => !!accessToken.value && !!user.value)
+  const isLoggedIn = computed(() => !!accessToken.value)
   const isAdmin = computed(() => user.value?.role === 'admin')
   const isGuest = computed(() => !user.value || user.value?.role === 'guest')
   const token = computed(() => accessToken.value)
@@ -56,14 +56,13 @@ export const useUserStore = defineStore('user', () => {
     try {
       const data = await get('/api/auth/me')
       user.value = data
-      localStorage.setItem(USER_KEY, JSON.stringify(data))
+      if (data) {
+        localStorage.setItem(USER_KEY, JSON.stringify(data))
+      }
       return data
     } catch (error) {
-      console.error('获取用户信息失败:', error)
-      accessToken.value = ''
-      user.value = null
-      clearTokens()
-      throw error
+      console.warn('获取用户信息失败（Token可能已过期，等待401刷新）:', error.message)
+      return null
     }
   }
 

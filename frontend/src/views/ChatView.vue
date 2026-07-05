@@ -1,5 +1,4 @@
 <template>
-  <CyberLayout>
     <div class="chat-page">
       <div class="conversation-sidebar">
         <div class="sidebar-header">
@@ -61,12 +60,10 @@
         <ChatInput @send="handleSendMessage" />
       </div>
     </div>
-  </CyberLayout>
 </template>
 
 <script setup>
 import { ref, onMounted, nextTick, watch } from 'vue'
-import CyberLayout from '@/components/CyberLayout.vue'
 import ChatMessage from '@/components/ChatMessage.vue'
 import ChatInput from '@/components/ChatInput.vue'
 import { useChatStore } from '@/stores/chat'

@@ -133,13 +133,12 @@ service.interceptors.response.use(
   }
 )
 
-export const createSSEConnection = (url, options = {}) => {
-  const { onMessage, onError, onOpen, headers = {} } = options
+export const createSSEConnection = (url, handlers = {}) => {
+  const { onMessage, onError, onOpen, onClose } = handlers
 
   const accessToken = getAccessToken()
   const finalHeaders = {
-    Accept: 'text/event-stream',
-    ...headers
+    Accept: 'text/event-stream'
   }
   if (accessToken) {
     finalHeaders.Authorization = `Bearer ${accessToken}`
@@ -149,8 +148,12 @@ export const createSSEConnection = (url, options = {}) => {
   let isClosed = false
 
   const close = () => {
+    if (isClosed) return
     isClosed = true
     controller.abort()
+    if (onClose) {
+      onClose()
+    }
   }
 
   const connect = async () => {
@@ -175,10 +178,12 @@ export const createSSEConnection = (url, options = {}) => {
             }
           } catch (e) {
             if (onError) onError(new Error('Unauthorized'))
+            close()
             return
           }
         }
         if (onError) onError(new Error(`HTTP error! status: ${response.status}`))
+        close()
         return
       }
 
@@ -196,39 +201,44 @@ export const createSSEConnection = (url, options = {}) => {
         const lines = buffer.split('\n')
         buffer = lines.pop() || ''
 
-        let eventType = 'message'
         let data = ''
 
         for (const line of lines) {
-          if (line.startsWith('event:')) {
-            eventType = line.slice(6).trim()
-          } else if (line.startsWith('data:')) {
-            data += line.slice(5).trim()
+          if (line.startsWith('data:')) {
+            const lineData = line.slice(5)
+            data += lineData.startsWith(' ') ? lineData.slice(1) : lineData
           } else if (line === '') {
             if (data && onMessage) {
-              onMessage(data, eventType)
+              onMessage(data)
             }
             data = ''
-            eventType = 'message'
           }
         }
       }
 
-      if (buffer && onMessage) {
+      if (buffer) {
         const lines = buffer.split('\n')
         let data = ''
         for (const line of lines) {
           if (line.startsWith('data:')) {
-            data += line.slice(5).trim()
+            const lineData = line.slice(5)
+            data += lineData.startsWith(' ') ? lineData.slice(1) : lineData
           }
         }
-        if (data) {
-          onMessage(data, 'message')
+        if (data && onMessage) {
+          onMessage(data)
         }
+      }
+
+      if (!isClosed && onClose) {
+        onClose()
       }
     } catch (err) {
       if (!isClosed && err.name !== 'AbortError') {
         if (onError) onError(err)
+      }
+      if (!isClosed && onClose) {
+        onClose()
       }
     }
   }

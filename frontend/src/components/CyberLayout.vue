@@ -92,11 +92,7 @@ const showLoginModal = ref(false)
 
 onMounted(async () => {
   if (userStore.token) {
-    try {
-      await userStore.getInfo()
-    } catch (error) {
-      console.error('Token无效，已自动登出')
-    }
+    await userStore.getInfo()
   }
 })
 

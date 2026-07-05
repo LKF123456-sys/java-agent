@@ -2,6 +2,7 @@ package com.ailearn.structured;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Service;
 
@@ -36,8 +37,8 @@ public class StructuredOutputService {
      *
      * @param chatClientBuilder ChatClient构建器
      */
-    public StructuredOutputService(ChatClient.Builder chatClientBuilder) {
-        this.chatClient = chatClientBuilder.build();
+    public StructuredOutputService(ChatModel chatModel) {
+        this.chatClient = ChatClient.builder(chatModel).build();
         log.info("结构化输出服务初始化完成");
     }
 

@@ -1,5 +1,4 @@
 <template>
-  <CyberLayout>
     <div class="home-container">
       <div class="hero-section">
         <h1 class="hero-title cyber-glow-text">CYBER AI LEARN PLATFORM</h1>
@@ -27,12 +26,10 @@
         </div>
       </div>
     </div>
-  </CyberLayout>
 </template>
 
 <script setup>
 import { useRouter } from 'vue-router'
-import CyberLayout from '@/components/CyberLayout.vue'
 
 const router = useRouter()
 

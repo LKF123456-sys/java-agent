@@ -1,4 +1,4 @@
-package com.ailearn.agent;
+﻿package com.ailearn.agent;
 
 import com.ailearn.common.BusinessException;
 import com.ailearn.common.ErrorCode;
@@ -7,15 +7,15 @@ import com.ailearn.entity.Conversation;
 import com.ailearn.memory.DatabaseChatMemory;
 import com.ailearn.security.UserPrincipal;
 import com.ailearn.service.ConversationService;
-import com.ailearn.tools.CalculatorTool;
-import com.ailearn.tools.WeatherTool;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
 import org.springframework.ai.chat.memory.ChatMemory;
+import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import reactor.core.publisher.Flux;
@@ -49,40 +49,12 @@ import java.util.Map;
 @RateLimiter(name = "agentService")
 public class MultiAgentService {
 
-    /**
-     * ChatClient构建器
-     * 由Spring AI自动注入，用于为每个角色Agent创建独立的ChatClient实例
-     */
-    private final ChatClient.Builder chatClientBuilder;
+    private final ChatModel chatModel;
 
-    /**
-     * 数据库聊天记忆实现
-     * 用于持久化各Agent的对话历史，支持多轮对话上下文
-     */
     private final DatabaseChatMemory chatMemory;
 
-    /**
-     * 天气查询工具
-     * 供Researcher Agent调用获取实时天气信息
-     */
-    private final WeatherTool weatherTool;
-
-    /**
-     * 数学计算工具
-     * 供Researcher Agent调用执行精确数学计算
-     */
-    private final CalculatorTool calculatorTool;
-
-    /**
-     * 会话服务
-     * 用于会话创建、查询和消息持久化操作
-     */
     private final ConversationService conversationService;
 
-    /**
-     * JSON对象映射器
-     * 用于构建SSE流式响应的JSON数据
-     */
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     /**
@@ -157,15 +129,11 @@ public class MultiAgentService {
      * @param calculatorTool    数学计算工具
      * @param conversationService 会话服务
      */
-    public MultiAgentService(ChatClient.Builder chatClientBuilder,
+    public MultiAgentService(ChatModel chatModel,
                              DatabaseChatMemory chatMemory,
-                             WeatherTool weatherTool,
-                             CalculatorTool calculatorTool,
                              ConversationService conversationService) {
-        this.chatClientBuilder = chatClientBuilder;
+        this.chatModel = chatModel;
         this.chatMemory = chatMemory;
-        this.weatherTool = weatherTool;
-        this.calculatorTool = calculatorTool;
         this.conversationService = conversationService;
         log.info("MultiAgentService初始化完成");
     }
@@ -178,14 +146,11 @@ public class MultiAgentService {
      * @param withTools    是否携带工具（天气、计算器）
      * @return ChatClient 配置好的Agent聊天客户端
      */
-    private ChatClient createAgent(String systemPrompt, boolean withTools) {
-        var builder = chatClientBuilder
+    private ChatClient createAgent(String systemPrompt) {
+        return ChatClient.builder(chatModel)
                 .defaultSystem(systemPrompt)
-                .defaultAdvisors(MessageChatMemoryAdvisor.builder(chatMemory).build());
-        if (withTools) {
-            builder.defaultTools(weatherTool, calculatorTool);
-        }
-        return builder.build();
+                .defaultAdvisors(MessageChatMemoryAdvisor.builder(chatMemory).build())
+                .build();
     }
 
     /**
@@ -205,10 +170,10 @@ public class MultiAgentService {
                 event.put("agent", agent);
             }
             event.put("content", content != null ? content : "");
-            return "data:" + objectMapper.writeValueAsString(event) + "\n\n";
+            return objectMapper.writeValueAsString(event);
         } catch (JsonProcessingException e) {
             log.error("SSE事件序列化失败", e);
-            return "data:{\"type\":\"error\",\"content\":\"事件序列化失败\"}\n\n";
+            return "{\"type\":\"error\",\"content\":\"事件序列化失败\"}";
         }
     }
 
@@ -239,7 +204,7 @@ public class MultiAgentService {
      * @return String Planner生成的任务规划结果
      */
     public String plannerAgent(String task, String conversationId) {
-        ChatClient agent = createAgent(PLANNER_SYSTEM_PROMPT, false);
+        ChatClient agent = createAgent(PLANNER_SYSTEM_PROMPT);
         return agent.prompt()
                 .user("请分析并规划任务：" + task)
                 .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, "planner_" + conversationId))
@@ -256,7 +221,7 @@ public class MultiAgentService {
      * @return String Researcher收集的信息和分析结果
      */
     public String researcherAgent(String query, String conversationId) {
-        ChatClient agent = createAgent(RESEARCHER_SYSTEM_PROMPT, true);
+        ChatClient agent = createAgent(RESEARCHER_SYSTEM_PROMPT);
         return agent.prompt()
                 .user("请研究并回答：" + query)
                 .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, "researcher_" + conversationId))
@@ -273,7 +238,7 @@ public class MultiAgentService {
      * @return String Coder生成的代码和解释
      */
     public String coderAgent(String task, String conversationId) {
-        ChatClient agent = createAgent(CODER_SYSTEM_PROMPT, false);
+        ChatClient agent = createAgent(CODER_SYSTEM_PROMPT);
         return agent.prompt()
                 .user("请完成编程任务：" + task)
                 .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, "coder_" + conversationId))
@@ -290,7 +255,7 @@ public class MultiAgentService {
      * @return String 最终整合后的完整答案
      */
     public String executorAgent(String task, String conversationId) {
-        ChatClient agent = createAgent(EXECUTOR_SYSTEM_PROMPT, true);
+        ChatClient agent = createAgent(EXECUTOR_SYSTEM_PROMPT);
         return agent.prompt()
                 .user("基于之前的讨论，请给出最终结果：" + task)
                 .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, "executor_" + conversationId))
@@ -375,7 +340,7 @@ public class MultiAgentService {
      * @return Flux<String> Planner输出的token流
      */
     private Flux<String> streamPlannerAgent(String task, String conversationId) {
-        ChatClient agent = createAgent(PLANNER_SYSTEM_PROMPT, false);
+        ChatClient agent = createAgent(PLANNER_SYSTEM_PROMPT);
         return agent.prompt()
                 .user("请分析并规划任务：" + task)
                 .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, "planner_" + conversationId))
@@ -392,7 +357,7 @@ public class MultiAgentService {
      * @return Flux<String> Researcher输出的token流
      */
     private Flux<String> streamResearcherAgent(String query, String conversationId) {
-        ChatClient agent = createAgent(RESEARCHER_SYSTEM_PROMPT, true);
+        ChatClient agent = createAgent(RESEARCHER_SYSTEM_PROMPT);
         return agent.prompt()
                 .user("请研究并回答：" + query)
                 .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, "researcher_" + conversationId))
@@ -409,7 +374,7 @@ public class MultiAgentService {
      * @return Flux<String> Coder输出的token流
      */
     private Flux<String> streamCoderAgent(String task, String conversationId) {
-        ChatClient agent = createAgent(CODER_SYSTEM_PROMPT, false);
+        ChatClient agent = createAgent(CODER_SYSTEM_PROMPT);
         return agent.prompt()
                 .user("请完成编程任务：" + task)
                 .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, "coder_" + conversationId))
@@ -426,7 +391,7 @@ public class MultiAgentService {
      * @return Flux<String> Critic输出的token流
      */
     private Flux<String> streamCriticAgent(String content, String conversationId) {
-        ChatClient agent = createAgent(CRITIC_SYSTEM_PROMPT, false);
+        ChatClient agent = createAgent(CRITIC_SYSTEM_PROMPT);
         return agent.prompt()
                 .user("请审查以下内容并给出改进建议：\n" + content)
                 .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, "critic_" + conversationId))
@@ -443,7 +408,7 @@ public class MultiAgentService {
      * @return Flux<String> Executor输出的token流
      */
     private Flux<String> streamExecutorAgent(String task, String conversationId) {
-        ChatClient agent = createAgent(EXECUTOR_SYSTEM_PROMPT, true);
+        ChatClient agent = createAgent(EXECUTOR_SYSTEM_PROMPT);
         return agent.prompt()
                 .user("基于之前的讨论，请给出最终结果：\n" + task)
                 .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, "executor_" + conversationId))
@@ -577,12 +542,30 @@ public class MultiAgentService {
         StringBuilder fullResponseBuilder = new StringBuilder();
 
         return streamCollaborativeExecute(task, convIdStr)
+                .doOnNext(event -> {
+                    try {
+                        Map<String, String> evt = objectMapper.readValue(event, new com.fasterxml.jackson.core.type.TypeReference<Map<String, String>>() {});
+                        if ("token".equals(evt.get("type")) && evt.get("content") != null) {
+                            fullResponseBuilder.append(evt.get("content"));
+                        }
+                    } catch (Exception ignored) {}
+                })
                 .doOnComplete(() -> {
-                    String fullResponse = fullResponseBuilder.toString();
-                    if (StringUtils.hasText(fullResponse)) {
-                        conversationService.saveMessage(finalConversationId, "assistant", fullResponse);
+                    try {
+                        String fullResponse = fullResponseBuilder.toString();
+                        if (StringUtils.hasText(fullResponse)) {
+                            conversationService.saveMessage(finalConversationId, "assistant", fullResponse);
+                        }
+                    } catch (Exception e) {
+                        log.warn("保存多Agent协作消息失败: {}", e.getMessage());
                     }
                 })
-                .doOnError(e -> log.error("多Agent流式协作失败", e));
+                .doOnError(e -> log.error("多Agent流式协作失败", e))
+                .onErrorResume(e -> {
+                    String errMsg = e.getMessage() != null ? e.getMessage() : "多Agent协作失败";
+                    log.warn("多Agent流异常，发送错误事件: {}", errMsg);
+                    return Flux.just(createSseEvent("error", null, errMsg),
+                            createSseEvent("done", null, "协作因错误终止"));
+                });
     }
 }

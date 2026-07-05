@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
 import org.springframework.ai.chat.memory.ChatMemory;
+import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.reader.pdf.PagePdfDocumentReader;
 import org.springframework.ai.reader.pdf.config.PdfDocumentReaderConfig;
@@ -104,10 +105,10 @@ public class RagService {
      * @param vectorStore       向量存储实现
      * @param chatMemory        数据库聊天记忆实现
      */
-    public RagService(ChatClient.Builder chatClientBuilder, VectorStore vectorStore, DatabaseChatMemory chatMemory) {
+    public RagService(ChatModel chatModel, VectorStore vectorStore, DatabaseChatMemory chatMemory) {
         this.vectorStore = vectorStore;
         this.chatMemory = chatMemory;
-        this.chatClient = chatClientBuilder
+        this.chatClient = ChatClient.builder(chatModel)
                 .defaultAdvisors(
                         MessageChatMemoryAdvisor.builder(chatMemory).build()
                 )
