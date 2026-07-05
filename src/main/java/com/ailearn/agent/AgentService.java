@@ -38,16 +38,34 @@ import reactor.core.publisher.Flux;
 @RateLimiter(name = "agentService")
 public class AgentService {
 
+    /**
+     * Agent聊天客户端
+     * 配置了系统提示词、对话记忆和工具回调，支持Agent自动调用工具完成任务
+     */
     private final ChatClient agentClient;
 
+    /**
+     * 会话服务
+     * 用于会话的创建、查询和消息持久化
+     */
     private final ConversationService conversationService;
 
+    /**
+     * 构造方法：初始化Agent服务
+     * 构建Agent专用的ChatClient，配置工具调用能力和对话记忆
+     *
+     * @param chatModel            聊天模型
+     * @param chatMemory           数据库聊天记忆实现，用于多轮对话上下文管理
+     * @param conversationService  会话服务
+     * @param toolCallbackProvider 工具回调提供者，自动注入所有可用工具（天气、计算器、搜索等）
+     */
     public AgentService(ChatModel chatModel,
                         DatabaseChatMemory chatMemory,
                         ConversationService conversationService,
                         ToolCallbackProvider toolCallbackProvider) {
         this.conversationService = conversationService;
         this.agentClient = ChatClient.builder(chatModel)
+                // Agent系统提示词：定义AI助手角色为工具调用专家，指导何时使用各种工具
                 .defaultSystem("""
                         你是一个专业的AI助手，具有以下能力：
                         1. 查询各城市天气信息（使用天气工具）
@@ -60,7 +78,9 @@ public class AgentService {
                         对于实时信息（新闻、价格、最新动态等），必须使用searchWeb工具搜索。
                         思考步骤：分析问题 → 判断是否需要工具 → 调用工具 → 综合回答
                         """)
+                // 配置对话记忆顾问，自动管理多轮对话上下文
                 .defaultAdvisors(MessageChatMemoryAdvisor.builder(chatMemory).build())
+                // 注册所有可用工具，Agent可自主决定调用哪个工具
                 .defaultToolCallbacks(toolCallbackProvider.getToolCallbacks())
                 .build();
         log.info("AgentService初始化完成，已注册工具: {}", toolCallbackProvider.getToolCallbacks().length);

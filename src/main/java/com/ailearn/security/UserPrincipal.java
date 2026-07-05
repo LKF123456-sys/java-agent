@@ -26,6 +26,10 @@ import java.util.Collections;
 @AllArgsConstructor
 public class UserPrincipal implements UserDetails {
 
+    /**
+     * 序列化版本UID
+     * 用于Java序列化机制的版本控制，确保序列化和反序列化时类版本一致
+     */
     private static final long serialVersionUID = 1L;
 
     /**

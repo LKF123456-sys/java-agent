@@ -50,16 +50,40 @@ import java.util.Map;
 @RateLimiter(name = "agentService")
 public class MultiAgentService {
 
+    /**
+     * 底层聊天模型
+     * 用于构建各个Agent角色的ChatClient实例
+     */
     private final ChatModel chatModel;
 
+    /**
+     * 数据库聊天记忆实现
+     * 为各Agent提供多轮对话上下文持久化能力
+     */
     private final DatabaseChatMemory chatMemory;
 
+    /**
+     * 会话服务
+     * 用于会话的创建、查询和消息持久化
+     */
     private final ConversationService conversationService;
 
+    /**
+     * 工具回调提供者
+     * 提供所有可用工具（天气、计算器、联网搜索等），供Researcher等Agent调用
+     */
     private final ToolCallbackProvider toolCallbackProvider;
 
+    /**
+     * JSON对象映射器
+     * 用于SSE事件序列化和Planner路由决策JSON解析
+     */
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    /**
+     * Critic审查最大迭代次数
+     * 编程任务中Coder生成代码后，Critic审查不通过时最多修改3轮，超过则强制通过
+     */
     private static final int MAX_CRITIC_ITERATIONS = 3;
 
     /**

@@ -59,21 +59,45 @@ public class RagService {
 
     /**
      * AI聊天客户端
-     * 由Spring AI自动注入，基于ChatModel构建，用于调用大模型生成回答
+     * 基于ChatModel构建，配置了ChatMemory支持多轮对话，用于调用大模型生成RAG回答
      */
     private final ChatClient chatClient;
 
+    /**
+     * 向量存储
+     * 用于存储文档向量嵌入和执行相似度检索，是RAG的核心组件
+     */
     private final VectorStore vectorStore;
 
+    /**
+     * 数据库聊天记忆实现
+     * 支持RAG对话的多轮上下文管理
+     */
     private final DatabaseChatMemory chatMemory;
 
+    /**
+     * RAG文档MyBatis Mapper
+     * 用于知识库文档元数据的数据库CRUD操作
+     */
     private final RagDocumentMapper ragDocumentMapper;
 
+    /**
+     * 文件上传目录
+     * 从配置文件读取，默认为uploads目录，用于保存用户上传的原始文件
+     */
     @Value("${app.upload.dir:uploads}")
     private String uploadDir;
 
+    /**
+     * 文档缓存
+     * Key为文档ID，Value为切分后的文档片段列表，用于快速访问已处理文档
+     */
     private final Map<String, List<Document>> documentCache = new HashMap<>();
 
+    /**
+     * 文档文件路径映射
+     * Key为文档ID，Value为原始文件在本地文件系统的存储路径，用于文档删除时清理文件
+     */
     private final Map<String, String> documentFilePaths = new HashMap<>();
 
     /**
@@ -110,6 +134,11 @@ public class RagService {
         log.info("RAG服务初始化完成");
     }
 
+    /**
+     * 服务启动时加载现有文档记录
+     * 从数据库查询所有已上传的文档元数据，重建documentFilePaths映射，
+     * 确保服务重启后仍能正确关联文档ID和文件路径
+     */
     private void loadExistingDocuments() {
         try {
             List<RagDocument> docs = ragDocumentMapper.selectList(
@@ -227,35 +256,55 @@ public class RagService {
         }
     }
 
+    /**
+     * 处理文档并存储到向量数据库（核心私有方法）
+     * 完整的文档入库流程：解析文档 → 按Token切分 → 添加元数据 → 向量化存储 → 保存元数据到数据库
+     *
+     * @param resource     文档资源
+     * @param documentName 文档名称
+     * @param filePath     原始文件存储路径
+     * @param fileSize     文件大小（字节）
+     * @return String 生成的文档ID（UUID）
+     * @throws BusinessException 文档解析或存储失败时抛出异常
+     */
     private String processAndStoreDocument(Resource resource, String documentName, String filePath, Long fileSize) {
         try {
+            // 生成唯一文档ID
             String documentId = UUID.randomUUID().toString();
+            // 第一步：解析文档（支持PDF/Word/文本格式）
             List<Document> documents = parseDocument(resource, documentName);
 
+            // 第二步：使用TokenTextSplitter按Token数量切分文档，避免超出模型上下文窗口
             TokenTextSplitter textSplitter = new TokenTextSplitter();
             List<Document> splitDocuments = textSplitter.split(documents);
 
+            // 第三步：为每个文档片段添加元数据，便于检索时溯源
             for (Document doc : splitDocuments) {
                 doc.getMetadata().put("documentId", documentId);
                 doc.getMetadata().put("documentName", documentName);
             }
 
+            // 第四步：将文档片段向量化并存入VectorStore
             vectorStore.add(splitDocuments);
+            // 更新本地缓存
             documentCache.put(documentId, splitDocuments);
             if (filePath != null) {
                 documentFilePaths.put(documentId, filePath);
             }
 
+            // 统计总字符数
             int totalChars = 0;
             for (Document doc : splitDocuments) {
                 totalChars += doc.getText() != null ? doc.getText().length() : 0;
             }
 
+            // 提取文件类型
             String fileType = "";
             if (documentName != null && documentName.contains(".")) {
                 fileType = documentName.substring(documentName.lastIndexOf(".") + 1).toLowerCase();
             }
 
+            // 第五步：保存文档元数据到关系型数据库
             RagDocument ragDoc = new RagDocument();
             ragDoc.setDocId(documentId);
             ragDoc.setFileName(documentName);
@@ -435,17 +484,36 @@ public class RagService {
         return deleted;
     }
 
+    /**
+     * 获取知识库文档总数
+     *
+     * @return int 文档记录数量
+     */
     public int getDocumentCount() {
         Long count = ragDocumentMapper.selectCount(null);
         return count != null ? count.intValue() : documentCache.size();
     }
 
+    /**
+     * 获取知识库所有文档列表
+     * 按创建时间倒序排列
+     *
+     * @return List&lt;RagDocument&gt; 文档元数据列表
+     */
     public List<RagDocument> listDocuments() {
         return ragDocumentMapper.selectList(
                 new LambdaQueryWrapper<RagDocument>().orderByDesc(RagDocument::getCreatedAt)
         );
     }
 
+    /**
+     * 添加纯文本内容到知识库
+     * 直接接收文本字符串，分块向量化后存入知识库，无需上传文件
+     *
+     * @param content 要添加的文本内容
+     * @param source  文本来源标识（可选）
+     * @throws BusinessException 内容为空时抛出异常
+     */
     public void addDocumentText(String content, String source) {
         if (!StringUtils.hasText(content)) {
             throw new BusinessException(ErrorCode.RAG_DOCUMENT_EMPTY);
@@ -457,17 +525,21 @@ public class RagService {
             doc.getMetadata().put("documentName", source != null ? source : "text-upload");
             doc.getMetadata().put("type", "text");
 
+            // 对文本进行Token切分
             TokenTextSplitter textSplitter = new TokenTextSplitter();
             List<Document> splitDocuments = textSplitter.split(List.of(doc));
 
+            // 为每个片段添加元数据
             for (Document splitDoc : splitDocuments) {
                 splitDoc.getMetadata().put("documentId", docId);
                 splitDoc.getMetadata().put("documentName", source != null ? source : "text-upload");
             }
 
+            // 向量化存储
             vectorStore.add(splitDocuments);
             documentCache.put(docId, splitDocuments);
 
+            // 保存元数据到数据库
             int totalChars = content.length();
             RagDocument ragDoc = new RagDocument();
             ragDoc.setDocId(docId);
@@ -486,6 +558,14 @@ public class RagService {
         }
     }
 
+    /**
+     * 上传文件并添加到知识库（Controller专用，返回详细结果）
+     * 调用uploadDocument处理文件，然后统计文档分块信息返回
+     *
+     * @param file   上传的文件
+     * @param source 文件来源标识
+     * @return Map&lt;String, Object&gt; 包含文档ID、文件名、类型、分块数、总字符数
+     */
     public Map<String, Object> addDocumentFile(MultipartFile file, String source) {
         if (file == null || file.isEmpty()) {
             throw new BusinessException(ErrorCode.RAG_DOCUMENT_EMPTY);

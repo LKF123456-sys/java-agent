@@ -14,7 +14,8 @@ import java.util.Map;
 
 /**
  * 系统基础控制器
- * 提供健康检查、系统信息等公开接口，无需认证即可访问
+ * 提供健康检查、服务信息等公开接口，所有接口无需认证即可访问
+ * 主要用于服务探活、负载均衡健康检查、监控系统检测、快速验证服务可用性等场景
  *
  * @author AiLearn Platform
  */
@@ -24,10 +25,20 @@ public class SystemController {
 
     /**
      * 健康检查接口
-     * 用于服务探活、负载均衡健康检查、监控系统检测等场景
-     * 返回服务状态、启动时间、运行时长等基本信息
+     * 返回服务运行状态、启动时间、JVM信息、内存使用情况等详细系统状态
+     * 用于K8s/Docker容器探活、Nginx负载均衡健康检查、Prometheus监控等场景
+     * 接口路径：GET /api/health
+     * 权限：permitAll（无需认证即可访问）
      *
-     * @return Result 包含系统健康状态信息的统一响应
+     * @return Result&lt;Map&lt;String, Object&gt;&gt; 包含系统健康状态信息的统一响应，具体字段：
+     *         - status: String 服务状态，固定为"UP"表示正常运行
+     *         - service: String 服务名称，固定为"java-ai-learn"
+     *         - timestamp: String 当前时间戳（ISO-8601格式）
+     *         - startTime: long JVM启动时间（毫秒时间戳）
+     *         - uptime: long JVM已运行时长（毫秒）
+     *         - vmName: String JVM名称
+     *         - vmVersion: String JVM版本
+     *         - memory: Map 内存使用信息，包含max（最大内存）、total（已分配内存）、free（空闲内存）、used（已使用内存），单位为字节
      */
     @GetMapping("/health")
     public Result<Map<String, Object>> health() {
@@ -55,9 +66,11 @@ public class SystemController {
 
     /**
      * 根路径欢迎接口
-     * 用于快速验证服务是否正常启动
+     * 用于快速验证服务是否正常启动，返回欢迎信息
+     * 接口路径：GET /api/
+     * 权限：permitAll（无需认证即可访问）
      *
-     * @return Result 包含欢迎信息的统一响应
+     * @return Result&lt;String&gt; 包含欢迎信息的统一响应
      */
     @GetMapping("/")
     public Result<String> welcome() {

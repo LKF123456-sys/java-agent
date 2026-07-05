@@ -196,6 +196,13 @@ public class RagController {
         return Result.success(stats);
     }
 
+    /**
+     * 获取知识库文档列表接口
+     * 返回知识库中所有已上传文档的元数据列表，按上传时间倒序排列。
+     * 接口路径：GET /api/rag/documents
+     *
+     * @return Result&lt;List&lt;RagDocument&gt;&gt; 文档列表，每个元素包含文档ID、文件名、类型、大小、分块数、上传时间等信息
+     */
     @GetMapping("/documents")
     @Operation(summary = "获取文档列表", description = "获取知识库中所有已上传的文档列表，按上传时间倒序排列")
     @ApiResponses(value = {
@@ -208,6 +215,15 @@ public class RagController {
         return Result.success(docs);
     }
 
+    /**
+     * 删除知识库文档接口
+     * 根据文档ID删除知识库中的文档，同时清理本地缓存、删除原始文件、删除数据库记录。
+     * 注意：当前VectorStore实现可能不支持向量数据的物理删除。
+     * 接口路径：DELETE /api/rag/documents/{docId}
+     *
+     * @param docId 要删除的文档ID（UUID格式）
+     * @return Result&lt;Map&lt;String, Object&gt;&gt; 包含deleted布尔值、docId和结果消息
+     */
     @DeleteMapping("/documents/{docId}")
     @Operation(summary = "删除文档", description = "从知识库中删除指定文档，同时删除关联的文件和向量数据")
     @ApiResponses(value = {
