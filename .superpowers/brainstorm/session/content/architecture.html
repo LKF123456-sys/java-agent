@@ -1,0 +1,140 @@
+<h2>Spring AI 学习平台 - 前后端分离架构方案</h2>
+<p class="subtitle">科技感UI设计 + Ollama本地模型 + 最新技术栈</p>
+
+<div class="section">
+  <h3>技术栈选型</h3>
+  <div class="cards">
+    <div class="card" data-choice="backend" onclick="toggleSelect(this)">
+      <div class="card-image" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 2rem; color: white;">
+        <div style="font-size: 2rem; font-weight: bold;">后端</div>
+        <div style="margin-top: 1rem; font-size: 0.9rem; opacity: 0.9;">
+          Spring Boot 3.4.x<br>
+          Spring AI 1.0.0-M6<br>
+          MySQL 8.0+<br>
+          Ollama集成
+        </div>
+      </div>
+      <div class="card-body">
+        <h3>Spring Boot 后端</h3>
+        <p>RESTful API + SSE流式响应 + 统一响应格式</p>
+      </div>
+    </div>
+    <div class="card" data-choice="frontend" onclick="toggleSelect(this)">
+      <div class="card-image" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); padding: 2rem; color: white;">
+        <div style="font-size: 2rem; font-weight: bold;">前端</div>
+        <div style="margin-top: 1rem; font-size: 0.9rem; opacity: 0.9;">
+          Vue 3.5+<br>
+          Vite 6.x<br>
+          Element Plus<br>
+          科技感主题
+        </div>
+      </div>
+      <div class="card-body">
+        <h3>Vue 3 前端</h3>
+        <p>Composition API + 暗色科技风 + 流式聊天界面</p>
+      </div>
+    </div>
+    <div class="card" data-choice="ai" onclick="toggleSelect(this)">
+      <div class="card-image" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); padding: 2rem; color: white;">
+        <div style="font-size: 2rem; font-weight: bold;">AI能力</div>
+        <div style="margin-top: 1rem; font-size: 0.9rem; opacity: 0.9;">
+          基础聊天<br>
+          记忆对话<br>
+          RAG知识库<br>
+          Agent工具调用<br>
+          结构化输出
+        </div>
+      </div>
+      <div class="card-body">
+        <h3>Spring AI 能力</h3>
+        <p>全部AI功能保留并增强，支持流式输出</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>核心功能模块</h3>
+  <div class="mockup">
+    <div class="mockup-header">功能架构预览</div>
+    <div class="mockup-body" style="padding: 1.5rem; background: #0a0a1a; color: #00d4ff; font-family: 'Courier New', monospace;">
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem;">
+        <div style="border: 1px solid #00d4ff33; padding: 1rem; border-radius: 8px; background: #00d4ff0a;">
+          <div style="color: #00ff88; font-weight: bold;">💬 聊天模块</div>
+          <div style="font-size: 0.85rem; margin-top: 0.5rem; opacity: 0.8;">
+            • 基础对话<br>
+            • 流式响应<br>
+            • 系统提示词
+          </div>
+        </div>
+        <div style="border: 1px solid #00d4ff33; padding: 1rem; border-radius: 8px; background: #00d4ff0a;">
+          <div style="color: #ff00ff; font-weight: bold;">🧠 记忆模块</div>
+          <div style="font-size: 0.85rem; margin-top: 0.5rem; opacity: 0.8;">
+            • 会话管理<br>
+            • 历史记录<br>
+            • MySQL持久化
+          </div>
+        </div>
+        <div style="border: 1px solid #00d4ff33; padding: 1rem; border-radius: 8px; background: #00d4ff0a;">
+          <div style="color: #ffff00; font-weight: bold;">📚 RAG模块</div>
+          <div style="font-size: 0.85rem; margin-top: 0.5rem; opacity: 0.8;">
+            • 文档上传<br>
+            • 向量检索<br>
+            • 知识库问答
+          </div>
+        </div>
+        <div style="border: 1px solid #00d4ff33; padding: 1rem; border-radius: 8px; background: #00d4ff0a;">
+          <div style="color: #ff6600; font-weight: bold;">🤖 Agent模块</div>
+          <div style="font-size: 0.85rem; margin-top: 0.5rem; opacity: 0.8;">
+            • 旅游规划<br>
+            • 工具调用<br>
+            • 多步推理
+          </div>
+        </div>
+        <div style="border: 1px solid #00d4ff33; padding: 1rem; border-radius: 8px; background: #00d4ff0a;">
+          <div style="color: #00ffff; font-weight: bold;">📋 结构化输出</div>
+          <div style="font-size: 0.85rem; margin-top: 0.5rem; opacity: 0.8;">
+            • 图书信息<br>
+            • 电影信息<br>
+            • JSON映射
+          </div>
+        </div>
+        <div style="border: 1px solid #00d4ff33; padding: 1rem; border-radius: 8px; background: #00d4ff0a;">
+          <div style="color: #ff0066; font-weight: bold;">🔧 工具模块</div>
+          <div style="font-size: 0.85rem; margin-top: 0.5rem; opacity: 0.8;">
+            • 天气查询<br>
+            • 计算器<br>
+            • 可扩展
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>科技感UI设计方向</h3>
+  <div class="options">
+    <div class="option" data-choice="cyber" onclick="toggleSelect(this)">
+      <div class="letter">A</div>
+      <div class="content">
+        <h3>赛博朋克风</h3>
+        <p>深蓝/紫色调 + 霓虹光效 + 网格背景 + 故障艺术效果</p>
+      </div>
+    </div>
+    <div class="option" data-choice="hud" onclick="toggleSelect(this)">
+      <div class="letter">B</div>
+      <div class="content">
+        <h3>HUD科技风</h3>
+        <p>深色背景 + 青色/蓝色线条 + 数据面板 + 扫描线动画</p>
+      </div>
+    </div>
+    <div class="option" data-choice="matrix" onclick="toggleSelect(this)">
+      <div class="letter">C</div>
+      <div class="content">
+        <h3>矩阵代码风</h3>
+        <p>黑绿配色 + 代码雨背景 + 终端风格 + 极简主义</p>
+      </div>
+    </div>
+  </div>
+</div>

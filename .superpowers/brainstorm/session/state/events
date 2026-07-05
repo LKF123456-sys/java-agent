@@ -1,0 +1,5 @@
+{"type":"click","text":"1\n      \n        💬 聊天页面\n        基础对话 + 流式输出 + 系统提示词设置 + Markdown渲染","choice":"chat","id":null,"timestamp":1783165400543}
+{"type":"click","text":"2\n      \n        🧠 记忆对话\n        会话持久化 + 历史记录 + 多轮对话上下文 + MySQL存储","choice":"memory","id":null,"timestamp":1783165401040}
+{"type":"click","text":"3\n      \n        📚 RAG知识库\n        文档上传 + 向量检索 + 知识库管理 + 问答测试","choice":"rag","id":null,"timestamp":1783165401749}
+{"type":"click","text":"4\n      \n        🤖 Agent智能体\n        旅游规划 + 工具调用展示 + 多步推理过程可视化","choice":"agent","id":null,"timestamp":1783165402383}
+{"type":"click","text":"1\n      \n        💬 聊天页面\n        基础对话 + 流式输出 + 系统提示词设置 + Markdown渲染","choice":"chat","id":null,"timestamp":1783165403550}

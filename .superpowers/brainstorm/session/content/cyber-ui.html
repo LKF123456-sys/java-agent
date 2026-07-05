@@ -1,0 +1,157 @@
+<h2>赛博朋克风格 UI 设计</h2>
+<p class="subtitle">深蓝紫霓虹色调 + 网格背景 + 光效动画 + 故障艺术</p>
+
+<div class="section">
+  <h3>主界面布局预览</h3>
+  <div class="mockup">
+    <div class="mockup-header">赛博朋克 AI 聊天平台 - 主界面</div>
+    <div class="mockup-body" style="padding: 0; background: #0a0a1f; overflow: hidden;">
+      <style>
+        .cyber-demo { font-family: 'Segoe UI', system-ui, sans-serif; }
+        .cyber-demo * { box-sizing: border-box; margin: 0; padding: 0; }
+        .cyber-header { background: linear-gradient(90deg, #0d0d2b 0%, #1a0a2e 50%, #0d0d2b 100%); border-bottom: 1px solid #ff00ff44; padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; }
+        .cyber-logo { color: #00ffff; font-weight: bold; font-size: 1.2rem; text-shadow: 0 0 10px #00ffff, 0 0 20px #00ffff66; letter-spacing: 2px; }
+        .cyber-nav { display: flex; gap: 20px; }
+        .cyber-nav-item { color: #888; font-size: 0.85rem; padding: 6px 12px; border: 1px solid transparent; cursor: pointer; transition: all 0.3s; }
+        .cyber-nav-item:hover, .cyber-nav-item.active { color: #ff00ff; border-color: #ff00ff66; text-shadow: 0 0 8px #ff00ff; box-shadow: 0 0 10px #ff00ff22; }
+        .cyber-container { display: flex; height: 400px; }
+        .cyber-sidebar { width: 220px; background: #0d0d25; border-right: 1px solid #6b00ff33; padding: 15px; }
+        .cyber-sidebar-title { color: #00ffff; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; opacity: 0.7; }
+        .cyber-chat-item { color: #aaa; font-size: 0.85rem; padding: 10px; margin-bottom: 8px; background: #1a1a3a; border-left: 2px solid #ff00ff44; cursor: pointer; transition: all 0.3s; }
+        .cyber-chat-item:hover { border-left-color: #00ffff; background: #252550; box-shadow: inset 0 0 20px #00ffff11; }
+        .cyber-chat-item.active { border-left-color: #ff00ff; color: #fff; background: linear-gradient(90deg, #ff00ff22, transparent); }
+        .cyber-main { flex: 1; display: flex; flex-direction: column; background: linear-gradient(180deg, #0a0a1f 0%, #0d0d2b 100%); position: relative; }
+        .cyber-messages { flex: 1; padding: 20px; overflow-y: auto; }
+        .cyber-msg { margin-bottom: 16px; }
+        .cyber-msg-ai { background: linear-gradient(135deg, #1a0a2e 0%, #0d1a3a 100%); border: 1px solid #00ffff33; border-radius: 8px; padding: 12px 16px; color: #ccc; font-size: 0.9rem; box-shadow: 0 0 15px #00ffff11; position: relative; }
+        .cyber-msg-ai::before { content: 'AI'; position: absolute; top: -8px; left: 12px; background: #00ffff; color: #000; font-size: 0.65rem; padding: 2px 8px; font-weight: bold; border-radius: 2px; }
+        .cyber-msg-user { background: linear-gradient(135deg, #2a0a3a 0%, #3a0a2e 100%); border: 1px solid #ff00ff33; border-radius: 8px; padding: 12px 16px; color: #eee; font-size: 0.9rem; margin-left: 40px; box-shadow: 0 0 15px #ff00ff11; position: relative; }
+        .cyber-msg-user::before { content: 'YOU'; position: absolute; top: -8px; right: 12px; background: #ff00ff; color: #fff; font-size: 0.65rem; padding: 2px 8px; font-weight: bold; border-radius: 2px; }
+        .cyber-input-area { padding: 15px 20px; border-top: 1px solid #6b00ff33; background: #0d0d2b; }
+        .cyber-input-wrap { display: flex; gap: 10px; }
+        .cyber-input { flex: 1; background: #151530; border: 1px solid #00ffff44; border-radius: 4px; padding: 12px 16px; color: #fff; font-size: 0.9rem; outline: none; transition: all 0.3s; }
+        .cyber-input:focus { border-color: #ff00ff; box-shadow: 0 0 15px #ff00ff33, inset 0 0 10px #ff00ff11; }
+        .cyber-btn { background: linear-gradient(135deg, #ff00ff 0%, #6b00ff 100%); border: none; color: #fff; padding: 12px 24px; font-weight: bold; cursor: pointer; font-size: 0.85rem; letter-spacing: 1px; text-transform: uppercase; transition: all 0.3s; clip-path: polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%); }
+        .cyber-btn:hover { box-shadow: 0 0 20px #ff00ff66; transform: translateY(-1px); }
+        .cyber-grid { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-image: linear-gradient(rgba(0,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0,255,255,0.03) 1px, transparent 1px); background-size: 30px 30px; pointer-events: none; }
+        .cyber-scanline { position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, transparent, #00ffff44, transparent); animation: scan 3s linear infinite; pointer-events: none; }
+        @keyframes scan { 0% { top: 0; } 100% { top: 100%; } }
+      </style>
+      <div class="cyber-demo">
+        <div class="cyber-header">
+          <div class="cyber-logo">⬡ AI_NEXUS</div>
+          <div class="cyber-nav">
+            <div class="cyber-nav-item active">聊天</div>
+            <div class="cyber-nav-item">记忆</div>
+            <div class="cyber-nav-item">知识库</div>
+            <div class="cyber-nav-item">Agent</div>
+            <div class="cyber-nav-item">工具</div>
+          </div>
+          <div style="color: #00ff88; font-size: 0.8rem;">● OLLAMA: QWEN2.5</div>
+        </div>
+        <div class="cyber-container">
+          <div class="cyber-sidebar">
+            <div class="cyber-sidebar-title">会话历史</div>
+            <div class="cyber-chat-item active">Spring AI 学习讨论</div>
+            <div class="cyber-chat-item">旅游规划助手</div>
+            <div class="cyber-chat-item">RAG知识库测试</div>
+            <div class="cyber-chat-item">结构化输出演示</div>
+            <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #6b00ff33;">
+              <div class="cyber-btn" style="width: 100%; text-align: center; font-size: 0.75rem; padding: 10px;">+ 新建会话</div>
+            </div>
+          </div>
+          <div class="cyber-main">
+            <div class="cyber-grid"></div>
+            <div class="cyber-scanline"></div>
+            <div class="cyber-messages">
+              <div class="cyber-msg cyber-msg-ai">欢迎使用 AI Nexus 平台。我已连接到本地 Ollama 服务，模型 qwen2.5:7b 已就绪。有什么可以帮助你的？</div>
+              <div class="cyber-msg cyber-msg-user">帮我解释一下 Spring AI 中的 Function Calling 机制</div>
+              <div class="cyber-msg cyber-msg-ai">Function Calling 是 Spring AI 实现 Agent 的核心机制。当模型需要外部信息时，会返回 tool_calls 请求，Spring AI 自动执行对应的 Java 方法，并将结果返回给模型继续推理...</div>
+            </div>
+            <div class="cyber-input-area">
+              <div class="cyber-input-wrap">
+                <input class="cyber-input" placeholder="输入消息... (Shift+Enter 换行)" />
+                <button class="cyber-btn">发送 ➤</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>赛博朋克设计元素</h3>
+  <div class="cards">
+    <div class="card" data-choice="colors" onclick="toggleSelect(this)">
+      <div class="card-image" style="height: 120px; background: linear-gradient(135deg, #0a0a1f 0%, #1a0a2e 50%, #0d0d2b 100%); position: relative; overflow: hidden;">
+        <div style="position: absolute; top: 20px; left: 20px; width: 40px; height: 40px; background: #00ffff; border-radius: 50%; box-shadow: 0 0 20px #00ffff;"></div>
+        <div style="position: absolute; top: 20px; right: 20px; width: 40px; height: 40px; background: #ff00ff; border-radius: 50%; box-shadow: 0 0 20px #ff00ff;"></div>
+        <div style="position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); width: 40px; height: 40px; background: #6b00ff; border-radius: 50%; box-shadow: 0 0 20px #6b00ff;"></div>
+      </div>
+      <div class="card-body">
+        <h3>霓虹配色</h3>
+        <p>主色 #00ffff(青) + #ff00ff(品红) + #6b00ff(紫)，深色背景</p>
+      </div>
+    </div>
+    <div class="card" data-choice="effects" onclick="toggleSelect(this)">
+      <div class="card-image" style="height: 120px; background: #0a0a1f; position: relative; overflow: hidden;">
+        <div style="position: absolute; inset: 0; background-image: linear-gradient(rgba(0,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(0,255,255,0.1) 1px, transparent 1px); background-size: 20px 20px;"></div>
+        <div style="position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, transparent, #00ffff, transparent);"></div>
+        <div style="position: absolute; inset: 0; background: linear-gradient(transparent 50%, rgba(0,0,0,0.1) 50%); background-size: 100% 4px;"></div>
+      </div>
+      <div class="card-body">
+        <h3>特效动画</h3>
+        <p>网格背景 + 扫描线 + 霓虹发光 + 故障闪烁 + 斜切按钮</p>
+      </div>
+    </div>
+    <div class="card" data-choice="layout" onclick="toggleSelect(this)">
+      <div class="card-image" style="height: 120px; background: #0d0d25; padding: 15px; display: flex; gap: 10px;">
+        <div style="width: 60px; background: #151530; border-left: 3px solid #ff00ff;"></div>
+        <div style="flex: 1; background: #0a0a1f; border: 1px solid #00ffff33; position: relative;">
+          <div style="position: absolute; top: 10px; left: 10px; right: 10px; height: 20px; background: #1a0a2e; border: 1px solid #00ffff22;"></div>
+          <div style="position: absolute; bottom: 10px; left: 10px; right: 10px; height: 30px; background: #151530; border: 1px solid #ff00ff44;"></div>
+        </div>
+      </div>
+      <div class="card-body">
+        <h3>布局结构</h3>
+        <p>左侧会话列表 + 右侧聊天区 + 顶部导航 + 底部输入</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>功能页面规划</h3>
+  <div class="options">
+    <div class="option" data-choice="chat" onclick="toggleSelect(this)">
+      <div class="letter">1</div>
+      <div class="content">
+        <h3>💬 聊天页面</h3>
+        <p>基础对话 + 流式输出 + 系统提示词设置 + Markdown渲染</p>
+      </div>
+    </div>
+    <div class="option" data-choice="memory" onclick="toggleSelect(this)">
+      <div class="letter">2</div>
+      <div class="content">
+        <h3>🧠 记忆对话</h3>
+        <p>会话持久化 + 历史记录 + 多轮对话上下文 + MySQL存储</p>
+      </div>
+    </div>
+    <div class="option" data-choice="rag" onclick="toggleSelect(this)">
+      <div class="letter">3</div>
+      <div class="content">
+        <h3>📚 RAG知识库</h3>
+        <p>文档上传 + 向量检索 + 知识库管理 + 问答测试</p>
+      </div>
+    </div>
+    <div class="option" data-choice="agent" onclick="toggleSelect(this)">
+      <div class="letter">4</div>
+      <div class="content">
+        <h3>🤖 Agent智能体</h3>
+        <p>旅游规划 + 工具调用展示 + 多步推理过程可视化</p>
+      </div>
+    </div>
+  </div>
+</div>
