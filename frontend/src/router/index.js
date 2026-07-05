@@ -4,6 +4,7 @@ import ChatView from '../views/ChatView.vue'
 import MemoryView from '../views/MemoryView.vue'
 import RagView from '../views/RagView.vue'
 import AgentView from '../views/AgentView.vue'
+import SearchAgentView from '../views/SearchAgentView.vue'
 import StructuredView from '../views/StructuredView.vue'
 import ToolsView from '../views/ToolsView.vue'
 import MultiAgentView from '../views/MultiAgentView.vue'
@@ -34,6 +35,11 @@ const routes = [
     path: '/agent',
     name: 'Agent',
     component: AgentView
+  },
+  {
+    path: '/search-agent',
+    name: 'SearchAgent',
+    component: SearchAgentView
   },
   {
     path: '/structured',

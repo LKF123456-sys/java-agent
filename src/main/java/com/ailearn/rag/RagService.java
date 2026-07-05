@@ -2,7 +2,10 @@ package com.ailearn.rag;
 
 import com.ailearn.common.BusinessException;
 import com.ailearn.common.ErrorCode;
+import com.ailearn.entity.RagDocument;
+import com.ailearn.mapper.RagDocumentMapper;
 import com.ailearn.memory.DatabaseChatMemory;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
@@ -29,6 +32,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -59,30 +63,18 @@ public class RagService {
      */
     private final ChatClient chatClient;
 
-    /**
-     * 向量存储
-     * 支持PgVector（PostgreSQL）和SimpleVectorStore（内存）两种实现，用于存储文档向量
-     */
     private final VectorStore vectorStore;
 
-    /**
-     * 数据库聊天记忆实现
-     * 用于持久化RAG对话历史，支持多轮对话上下文
-     */
     private final DatabaseChatMemory chatMemory;
 
-    /**
-     * 文件上传存储路径
-     * 从配置文件读取，默认为当前目录下的 uploads 文件夹
-     */
+    private final RagDocumentMapper ragDocumentMapper;
+
     @Value("${app.upload.dir:uploads}")
     private String uploadDir;
 
-    /**
-     * 文档解析结果缓存
-     * Key: 文档ID，Value: 解析切分后的文档片段列表，用于避免重复解析
-     */
     private final Map<String, List<Document>> documentCache = new HashMap<>();
+
+    private final Map<String, String> documentFilePaths = new HashMap<>();
 
     /**
      * RAG系统提示词
@@ -105,15 +97,33 @@ public class RagService {
      * @param vectorStore       向量存储实现
      * @param chatMemory        数据库聊天记忆实现
      */
-    public RagService(ChatModel chatModel, VectorStore vectorStore, DatabaseChatMemory chatMemory) {
+    public RagService(ChatModel chatModel, VectorStore vectorStore, DatabaseChatMemory chatMemory, RagDocumentMapper ragDocumentMapper) {
         this.vectorStore = vectorStore;
         this.chatMemory = chatMemory;
+        this.ragDocumentMapper = ragDocumentMapper;
         this.chatClient = ChatClient.builder(chatModel)
                 .defaultAdvisors(
                         MessageChatMemoryAdvisor.builder(chatMemory).build()
                 )
                 .build();
+        loadExistingDocuments();
         log.info("RAG服务初始化完成");
+    }
+
+    private void loadExistingDocuments() {
+        try {
+            List<RagDocument> docs = ragDocumentMapper.selectList(
+                    new LambdaQueryWrapper<RagDocument>().orderByDesc(RagDocument::getCreatedAt)
+            );
+            for (RagDocument doc : docs) {
+                if (doc.getFilePath() != null) {
+                    documentFilePaths.put(doc.getDocId(), doc.getFilePath());
+                }
+            }
+            log.info("已加载 {} 个文档记录", docs.size());
+        } catch (Exception e) {
+            log.warn("加载现有文档记录失败: {}", e.getMessage());
+        }
     }
 
     /**
@@ -159,19 +169,25 @@ public class RagService {
     public String addDocumentFromPath(String filePath) {
         try {
             Resource resource;
+            Path path;
             if (filePath.startsWith("file:")) {
                 resource = new UrlResource(filePath);
+                path = Paths.get(new java.net.URI(filePath));
             } else {
-                Path path = Paths.get(filePath);
+                path = Paths.get(filePath);
                 resource = new UrlResource(path.toUri());
             }
             if (!resource.exists()) {
                 throw new BusinessException(ErrorCode.RAG_DOCUMENT_NOT_FOUND);
             }
-            return processAndStoreDocument(resource, filePath);
+            String fileName = path.getFileName() != null ? path.getFileName().toString() : filePath;
+            long fileSize = Files.exists(path) ? Files.size(path) : 0;
+            return processAndStoreDocument(resource, fileName, filePath, fileSize);
         } catch (BusinessException e) {
             throw e;
-        } catch (MalformedURLException e) {
+        } catch (MalformedURLException | java.net.URISyntaxException e) {
+            throw new BusinessException(ErrorCode.RAG_FILE_READ_FAILED, e);
+        } catch (IOException e) {
             throw new BusinessException(ErrorCode.RAG_FILE_READ_FAILED, e);
         }
     }
@@ -203,32 +219,22 @@ public class RagService {
             Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
             log.info("文件已保存: {}", filePath);
             Resource resource = new UrlResource(filePath.toUri());
-            return processAndStoreDocument(resource, originalFilename);
+            String docId = processAndStoreDocument(resource, originalFilename, filePath.toString(), file.getSize());
+            return docId;
         } catch (IOException e) {
             log.error("文件上传失败", e);
             throw new BusinessException(ErrorCode.RAG_FILE_READ_FAILED, e);
         }
     }
 
-    /**
-     * 处理文档：解析文本 → 切分片段 → 向量化存储
-     * 根据文件扩展名自动选择合适的解析器，使用TokenTextSplitter进行智能切分
-     *
-     * @param resource     Spring Resource资源对象
-     * @param documentName 文档名称（用于元数据和日志）
-     * @return String 生成的文档ID
-     * @throws RuntimeException 文档解析失败时抛出异常
-     */
-    private String processAndStoreDocument(Resource resource, String documentName) {
+    private String processAndStoreDocument(Resource resource, String documentName, String filePath, Long fileSize) {
         try {
             String documentId = UUID.randomUUID().toString();
             List<Document> documents = parseDocument(resource, documentName);
 
-            // 使用TokenTextSplitter进行文本切分，默认参数：chunkSize=800, minChunkSize=100, keepSeparator=true
             TokenTextSplitter textSplitter = new TokenTextSplitter();
             List<Document> splitDocuments = textSplitter.split(documents);
 
-            // 为每个文档片段添加元数据：文档ID和文档名称
             for (Document doc : splitDocuments) {
                 doc.getMetadata().put("documentId", documentId);
                 doc.getMetadata().put("documentName", documentName);
@@ -236,7 +242,31 @@ public class RagService {
 
             vectorStore.add(splitDocuments);
             documentCache.put(documentId, splitDocuments);
-            log.info("文档处理完成: {}, 共 {} 个片段", documentName, splitDocuments.size());
+            if (filePath != null) {
+                documentFilePaths.put(documentId, filePath);
+            }
+
+            int totalChars = 0;
+            for (Document doc : splitDocuments) {
+                totalChars += doc.getText() != null ? doc.getText().length() : 0;
+            }
+
+            String fileType = "";
+            if (documentName != null && documentName.contains(".")) {
+                fileType = documentName.substring(documentName.lastIndexOf(".") + 1).toLowerCase();
+            }
+
+            RagDocument ragDoc = new RagDocument();
+            ragDoc.setDocId(documentId);
+            ragDoc.setFileName(documentName);
+            ragDoc.setFileType(fileType);
+            ragDoc.setFileSize(fileSize);
+            ragDoc.setChunkCount(splitDocuments.size());
+            ragDoc.setTotalChars((long) totalChars);
+            ragDoc.setFilePath(filePath);
+            ragDocumentMapper.insert(ragDoc);
+
+            log.info("文档处理完成: {}, 共 {} 个片段, 总字符: {}", documentName, splitDocuments.size(), totalChars);
             return documentId;
         } catch (Exception e) {
             log.error("文档处理失败: {}", documentName, e);
@@ -378,30 +408,44 @@ public class RagService {
      * @return boolean 删除是否成功
      */
     public boolean deleteDocument(String documentId) {
-        if (StringUtils.hasText(documentId) && documentCache.containsKey(documentId)) {
+        boolean deleted = false;
+        if (StringUtils.hasText(documentId)) {
             documentCache.remove(documentId);
-            log.info("文档已从缓存删除: {}", documentId);
-            return true;
+            String filePath = documentFilePaths.remove(documentId);
+            if (filePath != null) {
+                try {
+                    Path path = Paths.get(filePath);
+                    if (Files.exists(path)) {
+                        Files.delete(path);
+                        log.info("文件已删除: {}", filePath);
+                    }
+                } catch (IOException e) {
+                    log.warn("文件删除失败: {}", e.getMessage());
+                }
+            }
+            RagDocument doc = ragDocumentMapper.selectOne(
+                    new LambdaQueryWrapper<RagDocument>().eq(RagDocument::getDocId, documentId)
+            );
+            if (doc != null) {
+                ragDocumentMapper.deleteById(doc.getId());
+                deleted = true;
+            }
+            log.info("文档已删除: {}", documentId);
         }
-        return false;
+        return deleted;
     }
 
-    /**
-     * 获取知识库中已缓存的文档数量
-     *
-     * @return int 已缓存的文档片段总数
-     */
     public int getDocumentCount() {
-        return documentCache.values().stream().mapToInt(List::size).sum();
+        Long count = ragDocumentMapper.selectCount(null);
+        return count != null ? count.intValue() : documentCache.size();
     }
 
-    /**
-     * 添加纯文本内容到知识库（Controller专用方法）
-     * 将纯文本内容包装为Document，进行切分和向量化后存储
-     *
-     * @param content 纯文本内容
-     * @param source  文本来源标识
-     */
+    public List<RagDocument> listDocuments() {
+        return ragDocumentMapper.selectList(
+                new LambdaQueryWrapper<RagDocument>().orderByDesc(RagDocument::getCreatedAt)
+        );
+    }
+
     public void addDocumentText(String content, String source) {
         if (!StringUtils.hasText(content)) {
             throw new BusinessException(ErrorCode.RAG_DOCUMENT_EMPTY);
@@ -423,6 +467,18 @@ public class RagService {
 
             vectorStore.add(splitDocuments);
             documentCache.put(docId, splitDocuments);
+
+            int totalChars = content.length();
+            RagDocument ragDoc = new RagDocument();
+            ragDoc.setDocId(docId);
+            ragDoc.setFileName(source != null ? source : "文本内容-" + docId.substring(0, 8));
+            ragDoc.setFileType("txt");
+            ragDoc.setFileSize((long) content.length());
+            ragDoc.setChunkCount(splitDocuments.size());
+            ragDoc.setTotalChars((long) totalChars);
+            ragDoc.setFilePath(null);
+            ragDocumentMapper.insert(ragDoc);
+
             log.info("文本内容已添加到知识库: source={}, 共 {} 个片段", source, splitDocuments.size());
         } catch (Exception e) {
             log.error("文本内容添加失败", e);
@@ -430,14 +486,6 @@ public class RagService {
         }
     }
 
-    /**
-     * 上传文件到知识库（Controller专用方法）
-     * 上传文件并返回处理统计信息
-     *
-     * @param file   上传的文件
-     * @param source 文件来源标识
-     * @return Map<String, Object> 处理统计，包含documentCount、totalChars、fileType
-     */
     public Map<String, Object> addDocumentFile(MultipartFile file, String source) {
         if (file == null || file.isEmpty()) {
             throw new BusinessException(ErrorCode.RAG_DOCUMENT_EMPTY);
@@ -461,6 +509,7 @@ public class RagService {
         result.put("totalChars", totalChars);
         result.put("fileType", fileType);
         result.put("documentId", documentId);
+        result.put("filename", originalFilename);
         return result;
     }
 

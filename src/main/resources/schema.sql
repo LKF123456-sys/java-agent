@@ -34,6 +34,20 @@ CREATE TABLE IF NOT EXISTS sys_user (
     INDEX idx_role (role)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户表';
 
+CREATE TABLE IF NOT EXISTS rag_document (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    doc_id VARCHAR(64) NOT NULL UNIQUE COMMENT '文档UUID',
+    file_name VARCHAR(255) NOT NULL COMMENT '原始文件名',
+    file_type VARCHAR(50) COMMENT '文件类型(pdf/docx/txt/md等)',
+    file_size BIGINT COMMENT '文件大小(字节)',
+    chunk_count INT DEFAULT 0 COMMENT '分块数量',
+    total_chars BIGINT DEFAULT 0 COMMENT '总字符数',
+    file_path VARCHAR(512) COMMENT '存储路径',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_doc_id (doc_id),
+    INDEX idx_created_at (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='RAG知识库文档表';
+
 -- ============================================
 -- PostgreSQL + pgvector 向量存储参考 (切换数据库时使用)
 -- ============================================

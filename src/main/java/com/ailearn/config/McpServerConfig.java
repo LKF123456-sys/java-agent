@@ -3,6 +3,7 @@ package com.ailearn.config;
 import com.ailearn.mcp.SystemTools;
 import com.ailearn.tools.CalculatorTool;
 import com.ailearn.tools.WeatherTool;
+import com.ailearn.tools.WebSearchTool;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.ai.tool.method.MethodToolCallbackProvider;
@@ -53,16 +54,11 @@ public class McpServerConfig {
     public ToolCallbackProvider toolCallbackProvider(
             WeatherTool weatherTool,
             CalculatorTool calculatorTool,
-            SystemTools systemTools) {
-        // 记录MCP工具注册日志，列出所有注册的工具Bean
-        log.info("注册MCP工具: WeatherTool(天气查询), CalculatorTool(计算器), SystemTools(系统工具)");
-        // 使用Builder模式构建MethodToolCallbackProvider
-        // 将所有工具Bean传入，框架会自动扫描其中的@Tool方法
+            SystemTools systemTools,
+            WebSearchTool webSearchTool) {
+        log.info("注册MCP工具: WeatherTool(天气查询), CalculatorTool(计算器), SystemTools(系统工具), WebSearchTool(联网搜索)");
         return MethodToolCallbackProvider.builder()
-                // 指定包含工具方法的Spring Bean对象列表
-                // 这些Bean中被@Tool注解标记的public方法将被注册为AI可调用工具
-                .toolObjects(weatherTool, calculatorTool, systemTools)
-                // 构建并返回ToolCallbackProvider实例
+                .toolObjects(weatherTool, calculatorTool, systemTools, webSearchTool)
                 .build();
     }
 }

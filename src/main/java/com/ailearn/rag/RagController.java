@@ -2,6 +2,7 @@ package com.ailearn.rag;
 
 import com.ailearn.common.Result;
 import com.ailearn.dto.RagChatRequest;
+import com.ailearn.entity.RagDocument;
 import com.ailearn.security.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -19,6 +20,7 @@ import org.springframework.web.multipart.MultipartFile;
 import reactor.core.publisher.Flux;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -192,6 +194,37 @@ public class RagController {
         log.debug("获取知识库统计信息");
         Map<String, Object> stats = ragService.getDocumentStats();
         return Result.success(stats);
+    }
+
+    @GetMapping("/documents")
+    @Operation(summary = "获取文档列表", description = "获取知识库中所有已上传的文档列表，按上传时间倒序排列")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "获取成功"),
+            @ApiResponse(responseCode = "401", description = "未登录或Token无效")
+    })
+    public Result<List<RagDocument>> listDocuments() {
+        log.debug("获取文档列表");
+        List<RagDocument> docs = ragService.listDocuments();
+        return Result.success(docs);
+    }
+
+    @DeleteMapping("/documents/{docId}")
+    @Operation(summary = "删除文档", description = "从知识库中删除指定文档，同时删除关联的文件和向量数据")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "删除成功"),
+            @ApiResponse(responseCode = "401", description = "未登录或Token无效"),
+            @ApiResponse(responseCode = "404", description = "文档不存在")
+    })
+    public Result<Map<String, Object>> deleteDocument(
+            @Parameter(description = "文档ID（UUID）", required = true)
+            @PathVariable String docId) {
+        log.info("删除文档请求: docId={}", docId);
+        boolean deleted = ragService.deleteDocument(docId);
+        Map<String, Object> data = new HashMap<>();
+        data.put("deleted", deleted);
+        data.put("docId", docId);
+        data.put("message", deleted ? "文档删除成功" : "文档不存在或已删除");
+        return Result.success(data);
     }
 
     /**

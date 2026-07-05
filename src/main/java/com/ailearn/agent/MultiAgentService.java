@@ -1,4 +1,4 @@
-﻿package com.ailearn.agent;
+package com.ailearn.agent;
 
 import com.ailearn.common.BusinessException;
 import com.ailearn.common.ErrorCode;
@@ -16,6 +16,7 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import reactor.core.publisher.Flux;
@@ -55,17 +56,44 @@ public class MultiAgentService {
 
     private final ConversationService conversationService;
 
+    private final ToolCallbackProvider toolCallbackProvider;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    private static final int MAX_CRITIC_ITERATIONS = 3;
+
+    /**
+     * 任务路由决策内部类
+     * 存储Planner对任务复杂度和所需Agent的判断结果
+     */
+    private static class TaskRoute {
+        String complexity = "medium";
+        boolean needResearch = true;
+        boolean needCoder = false;
+        String planContent = "";
+    }
 
     /**
      * Planner Agent系统提示词
-     * 定义规划专家的角色职责：分析需求、分解任务、列出执行计划
+     * 定义规划专家的角色职责：分析需求、评估任务复杂度、分解任务、列出执行计划
+     * 要求首先输出JSON格式的任务复杂度判断，便于动态路由决策
      */
     private static final String PLANNER_SYSTEM_PROMPT = """
             你是一个任务规划专家（Planner Agent）。
-            你的职责是分析用户需求，将复杂任务分解为清晰、可执行的步骤。
-            请考虑任务的各个方面，列出详细的执行计划。
-            请用中文回答，结构清晰，条理分明。
+            你的职责是分析用户需求，评估任务复杂度，将复杂任务分解为清晰、可执行的步骤。
+            
+            【重要】请在回复的第一行输出JSON格式的任务评估结果（不要有任何其他前缀）：
+            {"complexity":"simple|medium|complex","needResearch":true|false,"needCoder":true|false}
+            
+            复杂度判断标准：
+            - simple：简单问候、闲聊、常识问答、概念解释，不需要实时数据或代码
+            - medium：需要实时信息查询、数据分析、多步骤推理，但不需要写代码
+            - complex：编程任务、复杂系统设计、需要多轮迭代优化的任务
+            
+            needResearch判断：是否需要联网搜索或使用工具查询实时信息
+            needCoder判断：是否需要编写代码来解决问题
+            
+            从第二行开始，给出详细的任务规划和执行步骤。请用中文回答，结构清晰，条理分明。
             """;
 
     /**
@@ -76,7 +104,8 @@ public class MultiAgentService {
             你是一个研究员（Researcher Agent）。
             你的职责是收集和分析信息，使用可用工具获取真实、准确的数据。
             请基于事实回答问题，提供详细的信息和数据支持。
-            可用工具：天气查询、数学计算。
+            可用工具：天气查询、数学计算、联网搜索(searchWeb)、系统信息。
+            对于实时信息、最新动态、新闻、价格等，必须使用searchWeb工具联网搜索。
             请用中文回答。
             """;
 
@@ -95,16 +124,37 @@ public class MultiAgentService {
             """;
 
     /**
+     * Coder修改代码时的系统提示词
+     * 根据Critic的审查意见修改和优化代码
+     */
+    private static final String CODER_REVISE_SYSTEM_PROMPT = """
+            你是一个高级编程专家（Coder Agent）。
+            现在你需要根据审查专家的反馈意见，对你之前生成的代码进行修改和优化。
+            请仔细阅读审查意见，针对性地修复问题、改进代码质量。
+            要求：
+            1. 完整输出修改后的全部代码（不要只输出修改部分）
+            2. 简要说明你做了哪些修改以及为什么
+            3. 确保修改后的代码完整可运行
+            请用中文回答。
+            """;
+
+    /**
      * Critic Agent系统提示词
      * 定义审查专家的角色职责：检查准确性完整性、识别问题风险、提出改进建议
+     * 要求输出结构化评审结果，明确标注是否通过
      */
     private static final String CRITIC_SYSTEM_PROMPT = """
             你是一个严格的质量审查专家（Critic Agent）。
             你的职责是审查其他Agent的输出，评估其质量：
             1. 检查内容的准确性和完整性
-            2. 识别潜在的问题和风险
-            3. 提出具体的改进建议
-            请客观公正地评价，给出建设性的反馈意见。请用中文回答。
+            2. 识别潜在的问题、漏洞和风险
+            3. 提出具体、可操作的改进建议
+            
+            请在回复开头第一行明确标注审查结果：
+            - 如果内容质量合格、无需修改，输出：【审查结果：通过】
+            - 如果内容需要改进，输出：【审查结果：需要修改】
+            
+            然后给出详细的评审意见和具体修改建议。请客观公正、严格要求，用中文回答。
             """;
 
     /**
@@ -131,11 +181,13 @@ public class MultiAgentService {
      */
     public MultiAgentService(ChatModel chatModel,
                              DatabaseChatMemory chatMemory,
-                             ConversationService conversationService) {
+                             ConversationService conversationService,
+                             ToolCallbackProvider toolCallbackProvider) {
         this.chatModel = chatModel;
         this.chatMemory = chatMemory;
         this.conversationService = conversationService;
-        log.info("MultiAgentService初始化完成");
+        this.toolCallbackProvider = toolCallbackProvider;
+        log.info("MultiAgentService初始化完成，工具数量: {}", toolCallbackProvider.getToolCallbacks().length);
     }
 
     /**
@@ -143,14 +195,17 @@ public class MultiAgentService {
      * 根据系统提示词和是否需要工具来创建独立的Agent客户端
      *
      * @param systemPrompt 该Agent的系统提示词，定义角色职责
-     * @param withTools    是否携带工具（天气、计算器）
+     * @param withTools    是否携带工具
      * @return ChatClient 配置好的Agent聊天客户端
      */
-    private ChatClient createAgent(String systemPrompt) {
-        return ChatClient.builder(chatModel)
+    private ChatClient createAgent(String systemPrompt, boolean withTools) {
+        var builder = ChatClient.builder(chatModel)
                 .defaultSystem(systemPrompt)
-                .defaultAdvisors(MessageChatMemoryAdvisor.builder(chatMemory).build())
-                .build();
+                .defaultAdvisors(MessageChatMemoryAdvisor.builder(chatMemory).build());
+        if (withTools) {
+            builder.defaultToolCallbacks(toolCallbackProvider.getToolCallbacks());
+        }
+        return builder.build();
     }
 
     /**
@@ -196,6 +251,65 @@ public class MultiAgentService {
     }
 
     /**
+     * 解析Planner输出，提取任务路由决策
+     * 从Planner输出的第一行JSON解析复杂度、是否需要Researcher/Coder，
+     * 如果解析失败则使用关键词匹配作为兜底策略
+     *
+     * @param plannerOutput Planner的完整输出内容
+     * @param originalTask  原始用户任务（用于兜底判断）
+     * @return TaskRoute 解析后的路由决策
+     */
+    private TaskRoute parseTaskRoute(String plannerOutput, String originalTask) {
+        TaskRoute route = new TaskRoute();
+        route.planContent = plannerOutput;
+
+        if (!StringUtils.hasText(plannerOutput)) {
+            route.needCoder = isCodingTask(originalTask);
+            route.needResearch = !isCodingTask(originalTask);
+            return route;
+        }
+
+        try {
+            String[] lines = plannerOutput.split("\n", 2);
+            String firstLine = lines[0].trim();
+
+            if (firstLine.startsWith("{") && firstLine.contains("complexity")) {
+                Map<String, Object> jsonMap = objectMapper.readValue(firstLine, new TypeReference<Map<String, Object>>() {});
+                if (jsonMap.get("complexity") != null) {
+                    route.complexity = jsonMap.get("complexity").toString();
+                }
+                if (jsonMap.get("needResearch") != null) {
+                    route.needResearch = Boolean.parseBoolean(jsonMap.get("needResearch").toString());
+                }
+                if (jsonMap.get("needCoder") != null) {
+                    route.needCoder = Boolean.parseBoolean(jsonMap.get("needCoder").toString());
+                }
+                if (lines.length > 1) {
+                    route.planContent = lines[1].trim();
+                } else {
+                    route.planContent = "";
+                }
+            } else {
+                route.needCoder = isCodingTask(originalTask);
+                route.needResearch = route.complexity.equals("medium") || route.complexity.equals("complex");
+            }
+        } catch (Exception e) {
+            log.warn("解析Planner路由决策失败，使用兜底策略: {}", e.getMessage());
+            route.needCoder = isCodingTask(originalTask);
+            route.needResearch = !isCodingTask(originalTask) && originalTask != null && originalTask.length() > 10;
+        }
+
+        if (isCodingTask(originalTask)) {
+            route.needCoder = true;
+            route.complexity = "complex";
+        }
+
+        log.info("任务路由决策: complexity={}, needResearch={}, needCoder={}", 
+                route.complexity, route.needResearch, route.needCoder);
+        return route;
+    }
+
+    /**
      * Planner Agent同步执行
      * 调用规划专家分析任务并生成执行计划
      *
@@ -204,7 +318,7 @@ public class MultiAgentService {
      * @return String Planner生成的任务规划结果
      */
     public String plannerAgent(String task, String conversationId) {
-        ChatClient agent = createAgent(PLANNER_SYSTEM_PROMPT);
+        ChatClient agent = createAgent(PLANNER_SYSTEM_PROMPT, false);
         return agent.prompt()
                 .user("请分析并规划任务：" + task)
                 .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, "planner_" + conversationId))
@@ -221,7 +335,7 @@ public class MultiAgentService {
      * @return String Researcher收集的信息和分析结果
      */
     public String researcherAgent(String query, String conversationId) {
-        ChatClient agent = createAgent(RESEARCHER_SYSTEM_PROMPT);
+        ChatClient agent = createAgent(RESEARCHER_SYSTEM_PROMPT, true);
         return agent.prompt()
                 .user("请研究并回答：" + query)
                 .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, "researcher_" + conversationId))
@@ -238,7 +352,7 @@ public class MultiAgentService {
      * @return String Coder生成的代码和解释
      */
     public String coderAgent(String task, String conversationId) {
-        ChatClient agent = createAgent(CODER_SYSTEM_PROMPT);
+        ChatClient agent = createAgent(CODER_SYSTEM_PROMPT, false);
         return agent.prompt()
                 .user("请完成编程任务：" + task)
                 .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, "coder_" + conversationId))
@@ -255,7 +369,7 @@ public class MultiAgentService {
      * @return String 最终整合后的完整答案
      */
     public String executorAgent(String task, String conversationId) {
-        ChatClient agent = createAgent(EXECUTOR_SYSTEM_PROMPT);
+        ChatClient agent = createAgent(EXECUTOR_SYSTEM_PROMPT, false);
         return agent.prompt()
                 .user("基于之前的讨论，请给出最终结果：" + task)
                 .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, "executor_" + conversationId))
@@ -340,7 +454,7 @@ public class MultiAgentService {
      * @return Flux<String> Planner输出的token流
      */
     private Flux<String> streamPlannerAgent(String task, String conversationId) {
-        ChatClient agent = createAgent(PLANNER_SYSTEM_PROMPT);
+        ChatClient agent = createAgent(PLANNER_SYSTEM_PROMPT, false);
         return agent.prompt()
                 .user("请分析并规划任务：" + task)
                 .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, "planner_" + conversationId))
@@ -357,7 +471,7 @@ public class MultiAgentService {
      * @return Flux<String> Researcher输出的token流
      */
     private Flux<String> streamResearcherAgent(String query, String conversationId) {
-        ChatClient agent = createAgent(RESEARCHER_SYSTEM_PROMPT);
+        ChatClient agent = createAgent(RESEARCHER_SYSTEM_PROMPT, true);
         return agent.prompt()
                 .user("请研究并回答：" + query)
                 .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, "researcher_" + conversationId))
@@ -374,10 +488,39 @@ public class MultiAgentService {
      * @return Flux<String> Coder输出的token流
      */
     private Flux<String> streamCoderAgent(String task, String conversationId) {
-        ChatClient agent = createAgent(CODER_SYSTEM_PROMPT);
+        ChatClient agent = createAgent(CODER_SYSTEM_PROMPT, false);
         return agent.prompt()
                 .user("请完成编程任务：" + task)
                 .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, "coder_" + conversationId))
+                .stream()
+                .content();
+    }
+
+    /**
+     * Coder Agent流式执行（根据审查意见修改）
+     * 根据Critic的反馈意见修改和优化代码
+     *
+     * @param originalCode  原始代码
+     * @param feedback      Critic的审查意见和修改建议
+     * @param conversationId 会话ID
+     * @return Flux<String> Coder修改后输出的token流
+     */
+    private Flux<String> streamCoderReviseAgent(String originalCode, String feedback, String conversationId, int round) {
+        ChatClient agent = createAgent(CODER_REVISE_SYSTEM_PROMPT, false);
+        String userPrompt = String.format("""
+                这是第%d轮修改。
+                
+                原始任务要求和你之前生成的代码：
+                %s
+                
+                审查专家的反馈意见：
+                %s
+                
+                请根据以上反馈修改代码，输出完整的修改后代码和修改说明。
+                """, round, originalCode, feedback);
+        return agent.prompt()
+                .user(userPrompt)
+                .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, "coder_revise_" + round + "_" + conversationId))
                 .stream()
                 .content();
     }
@@ -391,7 +534,7 @@ public class MultiAgentService {
      * @return Flux<String> Critic输出的token流
      */
     private Flux<String> streamCriticAgent(String content, String conversationId) {
-        ChatClient agent = createAgent(CRITIC_SYSTEM_PROMPT);
+        ChatClient agent = createAgent(CRITIC_SYSTEM_PROMPT, false);
         return agent.prompt()
                 .user("请审查以下内容并给出改进建议：\n" + content)
                 .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, "critic_" + conversationId))
@@ -408,7 +551,7 @@ public class MultiAgentService {
      * @return Flux<String> Executor输出的token流
      */
     private Flux<String> streamExecutorAgent(String task, String conversationId) {
-        ChatClient agent = createAgent(EXECUTOR_SYSTEM_PROMPT);
+        ChatClient agent = createAgent(EXECUTOR_SYSTEM_PROMPT, false);
         return agent.prompt()
                 .user("基于之前的讨论，请给出最终结果：\n" + task)
                 .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, "executor_" + conversationId))
@@ -418,8 +561,13 @@ public class MultiAgentService {
 
     /**
      * 多Agent协作流式执行（核心方法）
-     * 按顺序流式执行每个Agent，实时推送每个Agent的启动事件、token输出、结束事件，
-     * 可以看到完整的多Agent协作过程
+     * 按顺序流式执行每个Agent，支持动态路由和Critic迭代循环：
+     * 1. Planner先输出任务规划和复杂度评估
+     * 2. 根据复杂度动态决定：
+     *    - simple（简单任务）：跳过Researcher/Coder，直接Executor回答
+     *    - medium（中等任务）：Planner→Researcher→Executor
+     *    - complex（复杂任务/编程）：Planner→Researcher→Coder→Critic迭代→Executor
+     * 3. Critic迭代循环：Coder生成→Critic审查→不通过则修改→再审查，最多3轮
      *
      * @param task           用户任务描述
      * @param conversationId 会话ID字符串
@@ -430,9 +578,8 @@ public class MultiAgentService {
         StringBuilder researchBuilder = new StringBuilder();
         StringBuilder codeBuilder = new StringBuilder();
         StringBuilder criticBuilder = new StringBuilder();
-        boolean needCoder = isCodingTask(task);
+        final TaskRoute[] routeHolder = new TaskRoute[1];
 
-        // Planner阶段：发送启动事件 → 流式输出token → 发送结束事件
         Flux<String> plannerStream = Flux.concat(
                 Flux.just(createSseEvent("agent_start", "planner", "Planner Agent 开始任务规划...")),
                 streamPlannerAgent(task, conversationId)
@@ -444,21 +591,34 @@ public class MultiAgentService {
                 Flux.just(createSseEvent("agent_end", "planner", ""))
         );
 
-        // Researcher阶段：发送启动事件 → 流式输出token → 发送结束事件
-        Flux<String> researcherStream = Flux.concat(
-                Flux.just(createSseEvent("agent_start", "researcher", "Researcher Agent 开始信息收集...")),
-                streamResearcherAgent(task, conversationId)
-                        .map(token -> {
-                            researchBuilder.append(token);
-                            return createSseEvent("token", "researcher", token);
-                        })
-                        .onErrorResume(e -> Flux.just(createSseEvent("error", "researcher", e.getMessage()))),
-                Flux.just(createSseEvent("agent_end", "researcher", ""))
-        );
+        Flux<String> dynamicRouteStream = Flux.defer(() -> {
+            TaskRoute route = parseTaskRoute(planBuilder.toString(), task);
+            routeHolder[0] = route;
 
-        // Coder阶段：仅编程任务时执行，发送启动事件 → 流式输出token → 发送结束事件
-        Flux<String> coderStream = needCoder
-                ? Flux.concat(
+            if ("simple".equals(route.complexity) && !route.needResearch && !route.needCoder) {
+                return Flux.just(createSseEvent("info", null, "简单任务，跳过Researcher和Coder，直接生成回答..."));
+            }
+
+            Flux<String> stream = Flux.empty();
+
+            if (route.needResearch) {
+                Flux<String> researcherStream = Flux.concat(
+                        Flux.just(createSseEvent("agent_start", "researcher", "Researcher Agent 开始信息收集...")),
+                        streamResearcherAgent(task, conversationId)
+                                .map(token -> {
+                                    researchBuilder.append(token);
+                                    return createSseEvent("token", "researcher", token);
+                                })
+                                .onErrorResume(e -> Flux.just(createSseEvent("error", "researcher", e.getMessage()))),
+                        Flux.just(createSseEvent("agent_end", "researcher", ""))
+                );
+                stream = Flux.concat(stream, researcherStream);
+            } else {
+                stream = Flux.concat(stream, Flux.just(createSseEvent("info", null, "无需信息收集，跳过Researcher...")));
+            }
+
+            if (route.needCoder) {
+                Flux<String> coderStream = Flux.concat(
                         Flux.just(createSseEvent("agent_start", "coder", "Coder Agent 开始代码生成...")),
                         streamCoderAgent(task, conversationId)
                                 .map(token -> {
@@ -467,35 +627,41 @@ public class MultiAgentService {
                                 })
                                 .onErrorResume(e -> Flux.just(createSseEvent("error", "coder", e.getMessage()))),
                         Flux.just(createSseEvent("agent_end", "coder", ""))
-                )
-                : Flux.empty();
-
-        // Critic阶段：发送启动事件 → 基于前面结果审查 → 流式输出 → 发送结束事件
-        Flux<String> criticStream = Flux.concat(
-                Flux.just(createSseEvent("agent_start", "critic", "Critic Agent 开始质量审查...")),
-                Flux.defer(() -> {
-                    String criticInput = "规划结果：" + planBuilder + "\n\n研究结果：" + researchBuilder;
-                    if (needCoder) {
-                        criticInput += "\n\n代码结果：" + codeBuilder;
-                    }
-                    return streamCriticAgent(criticInput, conversationId)
-                            .map(token -> {
-                                criticBuilder.append(token);
-                                return createSseEvent("token", "critic", token);
-                            });
-                })
-                        .onErrorResume(e -> Flux.just(createSseEvent("error", "critic", e.getMessage()))),
-                Flux.just(createSseEvent("agent_end", "critic", ""))
-        );
-
-        // Executor阶段：发送启动事件 → 整合所有结果流式输出最终答案 → 发送结束和完成事件
-        Flux<String> executorStream = Flux.defer(() -> {
-            String executorInput = task + "\n\n规划结果：" + planBuilder
-                    + "\n\n研究结果：" + researchBuilder;
-            if (needCoder) {
-                executorInput += "\n\n代码结果：" + codeBuilder;
+                );
+                Flux<String> criticStream = runCriticIteration(planBuilder, researchBuilder, codeBuilder, criticBuilder, conversationId, 1);
+                stream = Flux.concat(stream, coderStream, criticStream);
+            } else if ("complex".equals(route.complexity)) {
+                Flux<String> criticOnlyStream = Flux.defer(() -> {
+                    criticBuilder.setLength(0);
+                    String criticInput = "规划结果：" + route.planContent + "\n\n研究结果：" + researchBuilder;
+                    return Flux.concat(
+                            Flux.just(createSseEvent("agent_start", "critic", "Critic Agent 开始质量审查...")),
+                            streamCriticAgent(criticInput, conversationId + "_review")
+                                    .map(token -> {
+                                        criticBuilder.append(token);
+                                        return createSseEvent("token", "critic", token);
+                                    })
+                                    .onErrorResume(e -> Flux.just(createSseEvent("error", "critic", e.getMessage()))),
+                            Flux.just(createSseEvent("agent_end", "critic", "")),
+                            Flux.just(createSseEvent("info", null, "审查完成，进入最终整合阶段..."))
+                    );
+                });
+                stream = Flux.concat(stream, criticOnlyStream);
             }
-            executorInput += "\n\n审查意见：" + criticBuilder;
+
+            return stream;
+        });
+
+        Flux<String> executorStream = Flux.defer(() -> {
+            TaskRoute route = routeHolder[0];
+            String executorInput = task + "\n\n规划结果：" + (route != null ? route.planContent : planBuilder.toString())
+                    + "\n\n研究结果：" + researchBuilder;
+            if (route != null && route.needCoder) {
+                executorInput += "\n\n最终代码结果：" + codeBuilder;
+            }
+            if (criticBuilder.length() > 0) {
+                executorInput += "\n\n审查意见：" + criticBuilder;
+            }
             return Flux.concat(
                     Flux.just(createSseEvent("agent_start", "executor", "Executor Agent 开始整合最终结果...")),
                     streamExecutorAgent(executorInput, conversationId)
@@ -506,8 +672,92 @@ public class MultiAgentService {
             );
         });
 
-        // 按顺序拼接所有Agent的流
-        return Flux.concat(plannerStream, researcherStream, coderStream, criticStream, executorStream);
+        return Flux.concat(plannerStream, dynamicRouteStream, executorStream);
+    }
+
+    /**
+     * 递归执行Critic审查和Coder修改的迭代循环
+     * Coder生成代码后，Critic进行审查；如果审查不通过且未达最大迭代次数，
+     * Coder根据反馈修改代码，然后再次进行审查，最多迭代MAX_CRITIC_ITERATIONS轮
+     *
+     * @param planBuilder     Planner输出结果构建器
+     * @param researchBuilder Researcher输出结果构建器
+     * @param codeBuilder     Coder输出结果构建器（会被修改后的代码覆盖）
+     * @param criticBuilder   Critic输出结果构建器
+     * @param conversationId  会话ID
+     * @param iteration       当前迭代轮次（从1开始）
+     * @return Flux<String> SSE事件流，包含审查和修改过程
+     */
+    private Flux<String> runCriticIteration(StringBuilder planBuilder,
+                                            StringBuilder researchBuilder,
+                                            StringBuilder codeBuilder,
+                                            StringBuilder criticBuilder,
+                                            String conversationId,
+                                            int iteration) {
+        final String finalPrevCriticOutput = criticBuilder.toString();
+        criticBuilder.setLength(0);
+
+        String criticInput = "规划结果：" + planBuilder + "\n\n研究结果：" + researchBuilder
+                + "\n\n" + (iteration == 1 ? "代码结果" : "修改后的代码") + "：" + codeBuilder;
+        if (iteration > 1) {
+            criticInput += "\n\n上一轮审查意见：" + finalPrevCriticOutput;
+        }
+
+        String agentName = iteration == 1 ? "critic" : "critic_review" + iteration;
+        String startMsg = iteration == 1
+                ? "Critic Agent 开始质量审查..."
+                : "Critic Agent 第" + iteration + "轮审查...";
+
+        Flux<String> reviewStream = Flux.concat(
+                Flux.just(createSseEvent("agent_start", agentName, startMsg)),
+                streamCriticAgent(criticInput, conversationId + "_iter" + iteration)
+                        .map(token -> {
+                            criticBuilder.append(token);
+                            return createSseEvent("token", agentName, token);
+                        })
+                        .onErrorResume(e -> Flux.just(createSseEvent("error", agentName, e.getMessage()))),
+                Flux.just(createSseEvent("agent_end", agentName, ""))
+        );
+
+        return reviewStream.thenMany(Flux.defer(() -> {
+            String criticOutput = criticBuilder.toString();
+            boolean passed = criticOutput.contains("【审查结果：通过】")
+                    || criticOutput.contains("审查结果：通过");
+            boolean forcePass = !criticOutput.contains("需要修改") && iteration >= MAX_CRITIC_ITERATIONS;
+
+            if (passed || forcePass || iteration >= MAX_CRITIC_ITERATIONS) {
+                String infoMsg;
+                if (passed) {
+                    infoMsg = "审查通过，进入最终整合阶段...";
+                } else {
+                    infoMsg = "已达最大迭代次数(" + MAX_CRITIC_ITERATIONS + "轮)，进入最终整合阶段...";
+                }
+                return Flux.just(createSseEvent("info", null, infoMsg));
+            }
+
+            String originalCode = codeBuilder.toString();
+            codeBuilder.setLength(0);
+            String reviseAgentName = "coder_revise" + iteration;
+
+            Flux<String> reviseStream = Flux.concat(
+                    Flux.just(createSseEvent("info", null,
+                            "审查未通过，开始第" + (iteration + 1) + "轮修改...")),
+                    Flux.just(createSseEvent("agent_start", reviseAgentName,
+                            "Coder Agent 根据审查意见修改代码（第" + iteration + "轮）...")),
+                    streamCoderReviseAgent(originalCode, criticOutput, conversationId, iteration)
+                            .map(token -> {
+                                codeBuilder.append(token);
+                                return createSseEvent("token", reviseAgentName, token);
+                            })
+                            .onErrorResume(e -> Flux.just(createSseEvent("error", reviseAgentName, e.getMessage()))),
+                    Flux.just(createSseEvent("agent_end", reviseAgentName, ""))
+            );
+
+            return Flux.concat(
+                    reviseStream,
+                    runCriticIteration(planBuilder, researchBuilder, codeBuilder, criticBuilder, conversationId, iteration + 1)
+            );
+        }));
     }
 
     /**

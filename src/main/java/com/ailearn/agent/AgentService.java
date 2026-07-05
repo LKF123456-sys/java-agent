@@ -13,18 +13,19 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import reactor.core.publisher.Flux;
 
 /**
  * Agent智能体服务类
- * 提供基于大语言模型的智能体对话能力，支持工具调用（天气查询、数学计算等），
+ * 提供基于大语言模型的智能体对话能力，支持工具调用（天气查询、数学计算、联网搜索等），
  * 同时支持同步调用和SSE流式输出两种模式，并自动将会话和消息持久化到数据库。
  *
  * <p>核心功能：
  * <ul>
- *   <li>工具调用对话：Agent可自动调用天气工具和计算器工具完成复杂任务</li>
+ *   <li>工具调用对话：Agent可自动调用天气工具、计算器工具、联网搜索工具完成复杂任务</li>
  *   <li>会话持久化：自动创建/获取会话，保存用户提问和AI回复</li>
  *   <li>流式输出：支持SSE实时推送token，提升用户体验</li>
  *   <li>限流保护：通过Resilience4j限制调用频率，防止模型服务被压垮</li>
@@ -43,21 +44,26 @@ public class AgentService {
 
     public AgentService(ChatModel chatModel,
                         DatabaseChatMemory chatMemory,
-                        ConversationService conversationService) {
+                        ConversationService conversationService,
+                        ToolCallbackProvider toolCallbackProvider) {
         this.conversationService = conversationService;
         this.agentClient = ChatClient.builder(chatModel)
                 .defaultSystem("""
                         你是一个专业的AI助手，具有以下能力：
                         1. 查询各城市天气信息（使用天气工具）
                         2. 进行数学计算（使用计算器工具）
-                        3. 根据用户需求给出专业建议
+                        3. 联网搜索获取实时信息（使用searchWeb搜索工具）
+                        4. 获取系统信息（使用系统工具）
+                        5. 根据用户需求给出专业建议
                         
                         请主动使用工具获取真实信息，而不是凭空猜测。
+                        对于实时信息（新闻、价格、最新动态等），必须使用searchWeb工具搜索。
                         思考步骤：分析问题 → 判断是否需要工具 → 调用工具 → 综合回答
                         """)
                 .defaultAdvisors(MessageChatMemoryAdvisor.builder(chatMemory).build())
+                .defaultToolCallbacks(toolCallbackProvider.getToolCallbacks())
                 .build();
-        log.info("AgentService初始化完成");
+        log.info("AgentService初始化完成，已注册工具: {}", toolCallbackProvider.getToolCallbacks().length);
     }
 
     /**

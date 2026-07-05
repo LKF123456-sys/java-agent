@@ -26,6 +26,10 @@
           <span class="nav-icon">◆</span>
           <span class="nav-text">Agent智能体</span>
         </router-link>
+        <router-link to="/search-agent" class="nav-item" :class="{ active: $route.path === '/search-agent' }">
+          <span class="nav-icon green-icon">◆</span>
+          <span class="nav-text">联网搜索</span>
+        </router-link>
         <router-link to="/multi-agent" class="nav-item" :class="{ active: $route.path === '/multi-agent' }">
           <span class="nav-icon purple-icon">◆</span>
           <span class="nav-text">多Agent协作</span>
@@ -197,6 +201,10 @@ const handleLoginSuccess = () => {
 
 .nav-icon.blue-icon {
   color: var(--cyber-blue);
+}
+
+.nav-icon.green-icon {
+  color: var(--cyber-green);
 }
 
 .nav-item:hover {

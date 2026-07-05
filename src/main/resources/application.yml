@@ -113,6 +113,13 @@ jwt:
   # Header名称
   header: Authorization
 
+# ==================== Tavily联网搜索配置 ====================
+tavily:
+  api-key: ${TAVILY_API_KEY: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}
+  base-url: https://api.tavily.com
+  max-results: 5
+  search-depth: basic
+
 # ==================== Resilience4j限流配置 ====================
 # 基于令牌桶算法的接口限流保护，防止AI接口被恶意调用打满资源
 # 使用@RateLimiter(name = "xxx")注解在Service方法上启用限流
@@ -147,6 +154,11 @@ resilience4j:
       ragService:
         limit-for-period: 5
         limit-refresh-period: 60s
+        timeout-duration: 0s
+      # 搜索Agent服务限流：5次/30秒（联网搜索API调用有成本）
+      searchAgentService:
+        limit-for-period: 5
+        limit-refresh-period: 30s
         timeout-duration: 0s
   # 熔断降级配置
   circuitbreaker:
