@@ -6,13 +6,16 @@ import com.ailearn.dto.ChatRequest;
 import com.ailearn.entity.Conversation;
 import com.ailearn.security.UserPrincipal;
 import com.ailearn.service.ConversationService;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
+import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.model.ChatModel;
 import reactor.core.publisher.Flux;
 import reactor.test.StepVerifier;
 
@@ -37,6 +40,9 @@ import static org.mockito.Mockito.*;
 class ChatServiceTest {
 
     @Mock
+    private ChatModel chatModel;
+
+    @Mock
     private ChatClient.Builder chatClientBuilder;
 
     @Mock
@@ -53,6 +59,8 @@ class ChatServiceTest {
 
     @Mock
     private ConversationService conversationService;
+
+    private MockedStatic<ChatClient> chatClientStatic;
 
     private ChatService chatService;
 
@@ -72,11 +80,22 @@ class ChatServiceTest {
     void setUp() {
         testUser = UserPrincipal.create(TEST_USER_ID, TEST_USERNAME, TEST_ROLE);
 
+        // Mock ChatClient静态builder方法
+        chatClientStatic = mockStatic(ChatClient.class);
+        chatClientStatic.when(() -> ChatClient.builder(chatModel)).thenReturn(chatClientBuilder);
+
         // Mock ChatClient构建链
         when(chatClientBuilder.defaultSystem(anyString())).thenReturn(chatClientBuilder);
         when(chatClientBuilder.build()).thenReturn(chatClient);
 
-        chatService = new ChatService(chatClientBuilder, conversationService);
+        chatService = new ChatService(chatModel, conversationService);
+    }
+
+    @AfterEach
+    void tearDown() {
+        if (chatClientStatic != null) {
+            chatClientStatic.close();
+        }
     }
 
     /**

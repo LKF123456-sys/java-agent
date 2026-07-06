@@ -17,6 +17,10 @@ import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
+
+import java.time.Duration;
 
 /**
  * Agent智能体服务类
@@ -211,33 +215,55 @@ public class AgentService {
 
         conversationService.saveMessage(finalConversationId, "user", task);
         log.debug("用户消息已保存（流式）: conversationId={}", finalConversationId);
+        final Long convId = finalConversationId;
 
-        StringBuilder responseBuilder = new StringBuilder();
+        // 采用"先同步获取完整结果，再模拟流式输出"的方式，绕过Ollama qwen模型流式工具调用时evalDuration为null的bug
+        Mono<String> agentCallMono = Mono.fromCallable(() -> {
+            log.debug("开始同步调用Agent获取完整结果: conversationId={}", convId);
+            String response = agentClient.prompt()
+                    .user(task)
+                    .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, "agent_" + convId))
+                    .call()
+                    .content();
+            if (StringUtils.hasText(response)) {
+                conversationService.saveMessage(convId, "assistant", response);
+                log.info("Agent同步调用完成: conversationId={}, responseLength={}", convId, response.length());
+            }
+            return response != null ? response : "";
+        }).subscribeOn(Schedulers.boundedElastic());
 
-        return agentClient.prompt()
-                .user(task)
-                .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, "agent_" + finalConversationId))
-                .stream()
-                .content()
-                .doOnNext(token -> {
-                    responseBuilder.append(token);
-                })
-                .doOnComplete(() -> {
-                    String fullResponse = responseBuilder.toString();
-                    if (StringUtils.hasText(fullResponse)) {
-                        conversationService.saveMessage(finalConversationId, "assistant", fullResponse);
-                        log.info("Agent流式调用完成: conversationId={}, responseLength={}",
-                                finalConversationId, fullResponse.length());
-                    }
-                })
-                .doOnError(e -> {
-                    log.error("Agent流式调用失败: conversationId={}, error={}", finalConversationId, e.getMessage(), e);
-                })
-                .onErrorResume(e -> {
-                    String errMsg = e.getMessage() != null ? e.getMessage() : "Agent调用失败";
-                    log.warn("Agent流异常，发送错误消息: {}", errMsg);
-                    return Flux.just("[ERROR] " + errMsg);
-                });
+        return agentCallMono.flatMapMany(fullResponse -> {
+            if (!StringUtils.hasText(fullResponse)) {
+                return Flux.just("[ERROR] Agent返回空回复");
+            }
+            // 将完整回复拆分成小块，模拟流式输出效果，每30ms输出2-4个字符
+            return Flux.fromArray(splitIntoChunks(fullResponse))
+                    .delayElements(Duration.ofMillis(25))
+                    .onErrorResume(e -> {
+                        log.error("Agent流式输出异常: conversationId={}, error={}", convId, e.getMessage(), e);
+                        return Flux.just("[ERROR] " + e.getMessage());
+                    });
+        }).onErrorResume(e -> {
+            log.error("Agent调用失败: conversationId={}, error={}", convId, e.getMessage(), e);
+            String errMsg = e.getMessage() != null ? e.getMessage() : "Agent调用失败";
+            return Flux.just("[ERROR] " + errMsg);
+        });
+    }
+
+    private String[] splitIntoChunks(String text) {
+        if (text == null || text.isEmpty()) {
+            return new String[0];
+        }
+        // 按字符拆分，每2-4个字符为一块，模拟自然的打字效果
+        java.util.List<String> chunks = new java.util.ArrayList<>();
+        int i = 0;
+        while (i < text.length()) {
+            int chunkSize = 2 + (int)(Math.random() * 3);
+            int end = Math.min(i + chunkSize, text.length());
+            chunks.add(text.substring(i, end));
+            i = end;
+        }
+        return chunks.toArray(new String[0]);
     }
 
     /**

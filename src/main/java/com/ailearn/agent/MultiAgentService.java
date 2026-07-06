@@ -20,7 +20,11 @@ import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
+import java.time.Duration;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -488,7 +492,8 @@ public class MultiAgentService {
 
     /**
      * Researcher Agent流式执行
-     * 以SSE流方式实时输出Researcher的信息收集过程和token
+     * 以SSE流方式实时输出Researcher的信息收集过程和token。
+     * 采用"先同步获取完整结果，再模拟流式输出"的方式，绕过Ollama qwen模型流式工具调用时evalDuration为null的bug。
      *
      * @param query          研究查询内容
      * @param conversationId 会话ID
@@ -496,11 +501,42 @@ public class MultiAgentService {
      */
     private Flux<String> streamResearcherAgent(String query, String conversationId) {
         ChatClient agent = createAgent(RESEARCHER_SYSTEM_PROMPT, true);
-        return agent.prompt()
+        // 同步调用获取完整结果，再拆分成小块模拟流式输出，避免流式工具调用的bug
+        Mono<String> researchMono = Mono.fromCallable(() -> agent.prompt()
                 .user("请研究并回答：" + query)
                 .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, "researcher_" + conversationId))
-                .stream()
-                .content();
+                .call()
+                .content()
+        ).subscribeOn(Schedulers.boundedElastic());
+
+        return researchMono.flatMapMany(fullResponse -> {
+            if (!StringUtils.hasText(fullResponse)) {
+                return Flux.just("");
+            }
+            return Flux.fromArray(splitIntoChunks(fullResponse))
+                    .delayElements(Duration.ofMillis(20));
+        });
+    }
+
+    /**
+     * 将文本拆分成小块，用于模拟流式输出效果
+     *
+     * @param text 原始文本
+     * @return String[] 拆分后的文本块数组
+     */
+    private String[] splitIntoChunks(String text) {
+        if (text == null || text.isEmpty()) {
+            return new String[0];
+        }
+        ArrayList<String> chunks = new ArrayList<>();
+        int i = 0;
+        while (i < text.length()) {
+            int chunkSize = 2 + (int)(Math.random() * 3);
+            int end = Math.min(i + chunkSize, text.length());
+            chunks.add(text.substring(i, end));
+            i = end;
+        }
+        return chunks.toArray(new String[0]);
     }
 
     /**
