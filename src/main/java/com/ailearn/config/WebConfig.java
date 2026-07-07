@@ -120,5 +120,24 @@ public class WebConfig implements WebMvcConfigurer {
         // Swagger UI根路径重定向到swagger-ui/index.html
         registry.addViewController("/swagger-ui/")
                 .setViewName("forward:/swagger-ui/index.html");
+        // SPA前端路由：所有Vue Router路由统一转发到index.html
+        registry.addViewController("/chat")
+                .setViewName("forward:/index.html");
+        registry.addViewController("/memory")
+                .setViewName("forward:/index.html");
+        registry.addViewController("/rag")
+                .setViewName("forward:/index.html");
+        registry.addViewController("/agent")
+                .setViewName("forward:/index.html");
+        registry.addViewController("/search-agent")
+                .setViewName("forward:/index.html");
+        registry.addViewController("/structured")
+                .setViewName("forward:/index.html");
+        registry.addViewController("/tools")
+                .setViewName("forward:/index.html");
+        registry.addViewController("/multi-agent")
+                .setViewName("forward:/index.html");
+        registry.addViewController("/mcp")
+                .setViewName("forward:/index.html");
     }
 }

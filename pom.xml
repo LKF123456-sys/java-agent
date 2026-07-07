@@ -51,9 +51,23 @@
 
         <!-- ========== Spring Boot Web核心 ========== -->
         <!-- Spring MVC Web支持，提供REST API能力 -->
-        <dependency>
+         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        
+
+        <!-- Spring Retry：重试支持（Spring AI 2.0必需） -->
+        <dependency>
+            <groupId>org.springframework.retry</groupId>
+            <artifactId>spring-retry</artifactId>
+            <version>2.0.4</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-aop</artifactId>
+            <version>6.2.8</version>
         </dependency>
 
         <!-- WebFlux响应式支持，SSE流式响应和Reactor类型依赖 -->
@@ -107,22 +121,10 @@
             <artifactId>spring-ai-vector-store</artifactId>
         </dependency>
 
-        <!-- VectorStore Advisor：RAG检索增强顾问 -->
-        <dependency>
-            <groupId>org.springframework.ai</groupId>
-            <artifactId>spring-ai-advisors-vector-store</artifactId>
-        </dependency>
-
         <!-- PgVector：PostgreSQL向量扩展存储 -->
         <dependency>
             <groupId>org.springframework.ai</groupId>
             <artifactId>spring-ai-starter-vector-store-pgvector</artifactId>
-        </dependency>
-
-        <!-- MCP Server：Model Context Protocol服务端（WebMVC模式） -->
-        <dependency>
-            <groupId>org.springframework.ai</groupId>
-            <artifactId>spring-ai-starter-mcp-server-webmvc</artifactId>
         </dependency>
 
         <!-- PDF文档读取器（基于Apache PDFBox） -->
@@ -274,6 +276,7 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <configuration>
+                    <mainClass>com.ailearn.AiLearnApplication</mainClass>
                     <excludes>
                         <!-- 打包时排除Lombok（运行时不需要） -->
                         <exclude>
