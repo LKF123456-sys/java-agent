@@ -134,6 +134,7 @@
 <script setup>
 import { ref, nextTick, onUnmounted } from 'vue'
 import { createSSEConnection } from '@/utils/request'
+import DOMPurify from 'dompurify'
 
 const taskGoal = ref('')
 const collaborating = ref(false)
@@ -176,15 +177,23 @@ const getAvatarClass = (agent) => {
   return `avatar-${agent}`
 }
 
+const escapeHtml = (text) => {
+  const div = document.createElement('div')
+  div.textContent = text
+  return div.innerHTML
+}
+
 const formatMessage = (text) => {
   if (!text) return ''
-  return text
+  let escaped = escapeHtml(text)
+  let html = escaped
     .replace(/\n/g, '<br>')
     .replace(/\*\*(.*?)\*\*/g, '<strong class="highlight">$1</strong>')
     .replace(/\*(.*?)\*/g, '<em>$1</em>')
     .replace(/^# (.*$)/gm, '<h3 class="msg-h3">$1</h3>')
     .replace(/^## (.*$)/gm, '<h4 class="msg-h4">$1</h4>')
     .replace(/^- (.*$)/gm, '<li class="msg-li">$1</li>')
+  return DOMPurify.sanitize(html)
 }
 
 const closeSSE = () => {

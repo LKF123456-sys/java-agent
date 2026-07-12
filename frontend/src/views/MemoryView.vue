@@ -76,7 +76,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, nextTick, computed } from 'vue'
+import { ref, onMounted, nextTick, computed, onUnmounted } from 'vue'
 import ChatMessage from '@/components/ChatMessage.vue'
 import ChatInput from '@/components/ChatInput.vue'
 import request, { createSSEConnection } from '@/utils/request'
@@ -247,6 +247,10 @@ onMounted(async () => {
   if (conversations.value.length > 0) {
     await loadConversation(conversations.value[0].id)
   }
+})
+
+onUnmounted(() => {
+  closeSSE()
 })
 </script>
 

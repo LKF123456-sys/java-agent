@@ -32,6 +32,12 @@ public class ChatMessage {
     private Long conversationId;
 
     /**
+     * 所属用户ID
+     * 关联sys_user表的id字段，实现用户数据隔离
+     */
+    private Long userId;
+
+    /**
      * 消息角色
      * 标识消息发送者身份：user(用户)、assistant(AI助手)、system(系统)
      */

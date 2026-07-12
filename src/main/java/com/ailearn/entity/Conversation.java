@@ -26,6 +26,12 @@ public class Conversation {
     private Long id;
 
     /**
+     * 所属用户ID
+     * 关联sys_user表的id字段，实现用户数据隔离
+     */
+    private Long userId;
+
+    /**
      * 会话标题
      * 用于展示的会话名称，通常由用户自定义或系统生成
      */

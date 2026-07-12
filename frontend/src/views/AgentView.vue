@@ -64,7 +64,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick } from 'vue'
+import { ref, computed, onMounted, nextTick, onUnmounted } from 'vue'
 import ChatMessage from '@/components/ChatMessage.vue'
 import ChatInput from '@/components/ChatInput.vue'
 import request, { createSSEConnection } from '@/utils/request'
@@ -207,6 +207,10 @@ onMounted(() => {
   if (agents.value.length > 0) {
     selectAgent(agents.value[0].id)
   }
+})
+
+onUnmounted(() => {
+  closeSSE()
 })
 </script>
 

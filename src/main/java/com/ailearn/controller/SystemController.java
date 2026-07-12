@@ -1,6 +1,8 @@
 package com.ailearn.controller;
 
 import com.ailearn.common.Result;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -21,6 +23,7 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api")
+@Tag(name = "系统信息", description = "系统健康检查和服务信息接口，无需认证")
 public class SystemController {
 
     /**
@@ -41,6 +44,7 @@ public class SystemController {
      *         - memory: Map 内存使用信息，包含max（最大内存）、total（已分配内存）、free（空闲内存）、used（已使用内存），单位为字节
      */
     @GetMapping("/health")
+    @Operation(summary = "健康检查", description = "返回服务运行状态、启动时间、JVM信息、内存使用情况等详细系统状态，用于K8s/Docker探活和负载均衡健康检查")
     public Result<Map<String, Object>> health() {
         Map<String, Object> healthInfo = new HashMap<>();
         healthInfo.put("status", "UP");
@@ -73,6 +77,7 @@ public class SystemController {
      * @return Result&lt;String&gt; 包含欢迎信息的统一响应
      */
     @GetMapping("/")
+    @Operation(summary = "欢迎页", description = "快速验证服务是否正常启动，返回欢迎信息")
     public Result<String> welcome() {
         return Result.success("Welcome to Java AI Learn Platform!");
     }

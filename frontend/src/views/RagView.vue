@@ -173,9 +173,10 @@
 </template>
 
 <script setup>
-import { ref, nextTick, onMounted, watch } from 'vue'
+import { ref, nextTick, onMounted, watch, onUnmounted } from 'vue'
 import { get, del } from '@/utils/request'
 import { createSSEConnection } from '@/utils/request'
+import DOMPurify from 'dompurify'
 
 const allowedExtensions = ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.html', '.htm', '.md', '.txt', '.ppt', '.pptx']
 
@@ -476,7 +477,7 @@ const renderContent = (content) => {
   html = html.replace(/\*(.*?)\*/g, '<em>$1</em>')
   html = html.replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>')
   html = html.replace(/\n/g, '<br>')
-  return html
+  return DOMPurify.sanitize(html)
 }
 
 watch(
@@ -490,6 +491,10 @@ watch(
 
 onMounted(() => {
   loadDocuments()
+})
+
+onUnmounted(() => {
+  closeSSE()
 })
 </script>
 

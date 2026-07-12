@@ -24,6 +24,7 @@
 <script setup>
 import { computed } from 'vue'
 import { marked } from 'marked'
+import DOMPurify from 'dompurify'
 import hljs from 'highlight.js'
 
 const props = defineProps({
@@ -71,7 +72,7 @@ marked.use({ renderer })
 const renderedContent = computed(() => {
   if (!props.message.content) return ''
   try {
-    return marked.parse(props.message.content)
+    return DOMPurify.sanitize(marked.parse(props.message.content))
   } catch (e) {
     console.error('Markdown parse error:', e)
     return props.message.content

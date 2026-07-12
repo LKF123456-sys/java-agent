@@ -4,23 +4,36 @@
 
 CREATE TABLE IF NOT EXISTS conversation (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL DEFAULT 1 COMMENT '所属用户ID',
     title VARCHAR(255) NOT NULL COMMENT '会话标题',
     type VARCHAR(50) NOT NULL COMMENT '会话类型：chat/memory/rag/agent/structured',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_user_id (user_id),
     INDEX idx_type (type),
+    INDEX idx_user_type (user_id, type),
     INDEX idx_created_at (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='会话表';
 
 CREATE TABLE IF NOT EXISTS chat_message (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     conversation_id BIGINT NOT NULL COMMENT '会话ID',
+    user_id BIGINT NOT NULL DEFAULT 1 COMMENT '所属用户ID',
     role VARCHAR(50) NOT NULL COMMENT '角色：user/assistant/system',
     content TEXT NOT NULL COMMENT '消息内容',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_conversation_id (conversation_id),
+    INDEX idx_user_id (user_id),
     INDEX idx_created_at (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='聊天消息表';
+
+-- 迁移：为已存在且缺少user_id字段的表添加字段（如果字段已存在会报错，continue-on-error=true会忽略）
+-- 如果您是从旧版本升级，建议手动执行以下SQL或删除旧表让系统自动重建
+-- ALTER TABLE conversation ADD COLUMN user_id BIGINT NOT NULL DEFAULT 1 COMMENT '所属用户ID' AFTER id;
+-- ALTER TABLE conversation ADD INDEX idx_user_id (user_id);
+-- ALTER TABLE conversation ADD INDEX idx_user_type (user_id, type);
+-- ALTER TABLE chat_message ADD COLUMN user_id BIGINT NOT NULL DEFAULT 1 COMMENT '所属用户ID' AFTER conversation_id;
+-- ALTER TABLE chat_message ADD INDEX idx_user_id (user_id);
 
 CREATE TABLE IF NOT EXISTS sys_user (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,

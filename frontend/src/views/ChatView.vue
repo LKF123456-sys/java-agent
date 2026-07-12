@@ -63,7 +63,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, nextTick, watch } from 'vue'
+import { ref, onMounted, nextTick, watch, onUnmounted } from 'vue'
 import ChatMessage from '@/components/ChatMessage.vue'
 import ChatInput from '@/components/ChatInput.vue'
 import { useChatStore } from '@/stores/chat'
@@ -133,6 +133,10 @@ onMounted(async () => {
   } catch (error) {
     console.error('初始化失败:', error)
   }
+})
+
+onUnmounted(() => {
+  chatStore.closeSSE()
 })
 </script>
 
