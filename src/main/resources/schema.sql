@@ -27,13 +27,63 @@ CREATE TABLE IF NOT EXISTS chat_message (
     INDEX idx_created_at (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='聊天消息表';
 
--- 迁移：为已存在且缺少user_id字段的表添加字段（如果字段已存在会报错，continue-on-error=true会忽略）
--- 如果您是从旧版本升级，建议手动执行以下SQL或删除旧表让系统自动重建
--- ALTER TABLE conversation ADD COLUMN user_id BIGINT NOT NULL DEFAULT 1 COMMENT '所属用户ID' AFTER id;
+-- 迁移：为已存在且缺少user_id字段的表添加字段
+-- 注意：以下语句在字段已存在时会报错，配置了continue-on-error=true会自动忽略错误
+-- 如果您是从旧版本升级且自动迁移失败，请手动执行以下SQL：
+-- ALTER TABLE conversation ADD COLUMN user_id BIGINT NOT NULL DEFAULT 1 AFTER id;
 -- ALTER TABLE conversation ADD INDEX idx_user_id (user_id);
 -- ALTER TABLE conversation ADD INDEX idx_user_type (user_id, type);
--- ALTER TABLE chat_message ADD COLUMN user_id BIGINT NOT NULL DEFAULT 1 COMMENT '所属用户ID' AFTER conversation_id;
+-- ALTER TABLE chat_message ADD COLUMN user_id BIGINT NOT NULL DEFAULT 1 AFTER conversation_id;
 -- ALTER TABLE chat_message ADD INDEX idx_user_id (user_id);
+-- 使用存储过程安全迁移（仅当字段不存在时添加）
+SET @dbname = DATABASE();
+SET @tablename = 'conversation';
+SET @columnname = 'user_id';
+SET @preparedStatement = (SELECT IF(
+  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = @dbname AND TABLE_NAME = @tablename AND COLUMN_NAME = @columnname) > 0,
+  'SELECT 1',
+  'ALTER TABLE conversation ADD COLUMN user_id BIGINT NOT NULL DEFAULT 1 AFTER id'
+));
+PREPARE alterIfNotExists FROM @preparedStatement;
+EXECUTE alterIfNotExists;
+DEALLOCATE PREPARE alterIfNotExists;
+
+SET @preparedStatement = (SELECT IF(
+  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA = @dbname AND TABLE_NAME = @tablename AND INDEX_NAME = 'idx_user_id') > 0,
+  'SELECT 1',
+  'ALTER TABLE conversation ADD INDEX idx_user_id (user_id)'
+));
+PREPARE alterIfNotExists FROM @preparedStatement;
+EXECUTE alterIfNotExists;
+DEALLOCATE PREPARE alterIfNotExists;
+
+SET @preparedStatement = (SELECT IF(
+  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA = @dbname AND TABLE_NAME = @tablename AND INDEX_NAME = 'idx_user_type') > 0,
+  'SELECT 1',
+  'ALTER TABLE conversation ADD INDEX idx_user_type (user_id, type)'
+));
+PREPARE alterIfNotExists FROM @preparedStatement;
+EXECUTE alterIfNotExists;
+DEALLOCATE PREPARE alterIfNotExists;
+
+SET @tablename = 'chat_message';
+SET @preparedStatement = (SELECT IF(
+  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = @dbname AND TABLE_NAME = @tablename AND COLUMN_NAME = @columnname) > 0,
+  'SELECT 1',
+  'ALTER TABLE chat_message ADD COLUMN user_id BIGINT NOT NULL DEFAULT 1 AFTER conversation_id'
+));
+PREPARE alterIfNotExists FROM @preparedStatement;
+EXECUTE alterIfNotExists;
+DEALLOCATE PREPARE alterIfNotExists;
+
+SET @preparedStatement = (SELECT IF(
+  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA = @dbname AND TABLE_NAME = @tablename AND INDEX_NAME = 'idx_user_id') > 0,
+  'SELECT 1',
+  'ALTER TABLE chat_message ADD INDEX idx_user_id (user_id)'
+));
+PREPARE alterIfNotExists FROM @preparedStatement;
+EXECUTE alterIfNotExists;
+DEALLOCATE PREPARE alterIfNotExists;
 
 CREATE TABLE IF NOT EXISTS sys_user (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,

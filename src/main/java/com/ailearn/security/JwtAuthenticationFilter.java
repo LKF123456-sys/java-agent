@@ -89,7 +89,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
      * - /mcp/**：MCP协议端点
      */
     private static final List<String> WHITE_LIST_PATHS = Arrays.asList(
-            "/api/auth/**",
+            "/api/auth/register",
+            "/api/auth/login",
+            "/api/auth/refresh",
             "/api/health",
             "/api/",
             "/error",

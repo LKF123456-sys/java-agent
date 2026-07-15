@@ -224,11 +224,14 @@ class UserServiceTest { // UserService单元测试类定义
         when(jwtUtil.extractUsername(refreshToken)).thenReturn(TEST_USERNAME); // Mock提取用户名
         when(jwtUtil.extractRole(refreshToken)).thenReturn(TEST_ROLE); // Mock提取角色
         when(jwtUtil.generateAccessToken(TEST_USER_ID, TEST_USERNAME, TEST_ROLE)).thenReturn("new-access-token"); // Mock生成新Access Token
+        when(jwtUtil.generateRefreshToken(TEST_USER_ID, TEST_USERNAME, TEST_ROLE)).thenReturn("new-refresh-token"); // Mock生成新Refresh Token
 
-        String newAccessToken = userService.refreshToken(refreshToken); // 执行刷新
+        Map<String, String> tokens = userService.refreshToken(refreshToken); // 执行刷新
 
-        assertEquals("new-access-token", newAccessToken, "应返回新的Access Token"); // 返回新Token
-        verify(jwtUtil).generateAccessToken(TEST_USER_ID, TEST_USERNAME, TEST_ROLE); // 验证Token生成调用
+        assertEquals("new-access-token", tokens.get("accessToken"), "应返回新的Access Token"); // 返回新Access Token
+        assertEquals("new-refresh-token", tokens.get("refreshToken"), "应返回新的Refresh Token"); // 返回新Refresh Token
+        verify(jwtUtil).generateAccessToken(TEST_USER_ID, TEST_USERNAME, TEST_ROLE); // 验证Access Token生成调用
+        verify(jwtUtil).generateRefreshToken(TEST_USER_ID, TEST_USERNAME, TEST_ROLE); // 验证Refresh Token生成调用
     } // testRefreshToken_Success方法结束
 
     @Test

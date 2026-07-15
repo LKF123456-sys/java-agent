@@ -79,6 +79,13 @@ export const useUserStore = defineStore('user', () => {
 
   initFromStorage()
 
+  if (typeof window !== 'undefined') {
+    window.addEventListener('auth:logout', () => {
+      accessToken.value = ''
+      user.value = null
+    })
+  }
+
   return {
     user,
     accessToken,

@@ -10,6 +10,16 @@ const createStreamChat = (url, onMessage) => {
       onMessage: (data) => {
         if (!data) return
         
+        if (data.startsWith('[META]')) {
+          try {
+            const meta = JSON.parse(data.substring(6))
+            if (meta.conversationId && onMessage._conversationIdCallback) {
+              onMessage._conversationIdCallback(meta.conversationId)
+            }
+          } catch (e) {}
+          return
+        }
+        
         if (data.startsWith('[ERROR]')) {
           hasError = true
           reject(new Error(data.substring(7)))
@@ -50,6 +60,10 @@ const createMultiAgentStream = (url, onMessage) => {
     sseConnection = createSSEConnection(url, {
       onMessage: (data) => {
         if (!data) return
+        
+        if (data.startsWith('[META]')) {
+          return
+        }
         
         if (data.startsWith('[ERROR]')) {
           hasError = true

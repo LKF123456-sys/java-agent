@@ -158,38 +158,31 @@ public class AgentService {
         final Long convId = finalConversationId;
         final Long uid = userId;
 
-        String convIdEvent = String.format("[META]{\"conversationId\":%d}\n\n", convId);
+        StringBuilder fullReply = new StringBuilder();
 
-        Mono<String> agentCallMono = Mono.fromCallable(() -> {
-            log.debug("开始同步调用Agent获取完整结果: conversationId={}", convId);
-            String response = agentClient.prompt()
-                    .user(task)
-                    .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, "agent_" + convId))
-                    .call()
-                    .content();
-            if (StringUtils.hasText(response)) {
-                conversationService.saveMessage(uid, convId, "assistant", response);
-                log.info("Agent同步调用完成: conversationId={}, responseLength={}", convId, response.length());
-            }
-            return response != null ? response : "";
-        }).subscribeOn(Schedulers.boundedElastic());
-
-        return Flux.just(convIdEvent)
-                .concatWith(agentCallMono.flatMapMany(fullResponse -> {
-                    if (!StringUtils.hasText(fullResponse)) {
-                        return Flux.just("[ERROR] Agent返回空回复");
+        return agentClient.prompt()
+                .user(task)
+                .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, "agent_" + convId))
+                .stream()
+                .content()
+                .doOnNext(chunk -> {
+                    if (chunk != null) {
+                        fullReply.append(chunk);
                     }
-                    return Flux.fromArray(StreamUtils.splitIntoChunks(fullResponse))
-                            .delayElements(Duration.ofMillis(25))
-                            .onErrorResume(e -> {
-                                log.error("Agent流式输出异常: conversationId={}, error={}", convId, e.getMessage(), e);
-                                return Flux.just("[ERROR] " + e.getMessage());
-                            });
-                }).onErrorResume(e -> {
-                    log.error("Agent调用失败: conversationId={}, error={}", convId, e.getMessage(), e);
+                })
+                .doOnComplete(() -> {
+                    String aiReply = fullReply.toString();
+                    if (StringUtils.hasText(aiReply)) {
+                        conversationService.saveMessage(uid, convId, "assistant", aiReply);
+                        log.info("Agent流式调用完成: conversationId={}, responseLength={}", convId, aiReply.length());
+                    }
+                })
+                .doOnError(e -> log.error("Agent流式调用错误: conversationId={}, error={}", convId, e.getMessage(), e))
+                .onErrorResume(e -> {
+                    log.error("Agent流式调用失败: conversationId={}, error={}", convId, e.getMessage(), e);
                     String errMsg = e.getMessage() != null ? e.getMessage() : "Agent调用失败";
                     return Flux.just("[ERROR] " + errMsg);
-                }));
+                });
     }
 
     public String planTravel(String destination, int days) {

@@ -166,7 +166,6 @@ public class SearchAgentService {
 
         StringBuilder responseBuilder = new StringBuilder();
         String searchingMsg = "🔍 正在联网搜索...\n\n";
-        String convIdEvent = String.format("[META]{\"conversationId\":%d}\n\n", finalConversationId);
 
         Mono<String> searchMono = Mono.fromCallable(() -> {
             try {
@@ -177,7 +176,7 @@ public class SearchAgentService {
             }
         }).subscribeOn(Schedulers.boundedElastic());
 
-        return Flux.just(convIdEvent, searchingMsg)
+        return Flux.just(searchingMsg)
                 .doOnNext(responseBuilder::append)
                 .concatWith(searchMono.flatMapMany(userPrompt -> {
                     boolean searchFailed = userPrompt.contains("联网搜索暂时不可用");
@@ -192,14 +191,7 @@ public class SearchAgentService {
                 .doOnComplete(() -> {
                     String fullResponse = responseBuilder.toString();
                     if (StringUtils.hasText(fullResponse)) {
-                        String assistantContent = fullResponse;
-                        if (assistantContent.startsWith("[META]")) {
-                            int idx = assistantContent.indexOf("\n\n");
-                            if (idx > 0) {
-                                assistantContent = assistantContent.substring(idx + 2);
-                            }
-                        }
-                        assistantContent = assistantContent
+                        String assistantContent = fullResponse
                                 .replace("🔍 正在联网搜索...\n\n", "")
                                 .replace("⚠️ 联网搜索失败，将基于已有知识回答...\n\n", "");
                         conversationService.saveMessage(uid, finalConversationId, "assistant", assistantContent);

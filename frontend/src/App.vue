@@ -97,7 +97,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -110,6 +110,16 @@ const userStore = useUserStore()
 const isCollapse = ref(false)
 
 const activeMenu = computed(() => route.path)
+
+onMounted(async () => {
+  if (userStore.isLoggedIn) {
+    try {
+      await userStore.getInfo()
+    } catch (e) {
+      // getInfo失败会在request拦截器中处理401并跳转到首页
+    }
+  }
+})
 
 const toggleCollapse = () => {
   isCollapse.value = !isCollapse.value

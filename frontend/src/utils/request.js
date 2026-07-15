@@ -34,6 +34,7 @@ export const clearTokens = () => {
   localStorage.removeItem(ACCESS_TOKEN_KEY)
   localStorage.removeItem(REFRESH_TOKEN_KEY)
   localStorage.removeItem(USER_KEY)
+  window.dispatchEvent(new CustomEvent('auth:logout'))
 }
 
 const service = axios.create({
@@ -58,6 +59,10 @@ service.interceptors.request.use(
 const refreshTokenRequest = async () => {
   const refreshToken = getRefreshToken()
   if (!refreshToken) {
+    clearTokens()
+    if (router.currentRoute.value.path !== '/') {
+      router.push('/')
+    }
     throw new Error('No refresh token available')
   }
   try {
@@ -73,8 +78,9 @@ const refreshTokenRequest = async () => {
     throw new Error(res.message || 'Token refresh failed')
   } catch (error) {
     clearTokens()
-    router.push('/')
-    window.location.reload()
+    if (router.currentRoute.value.path !== '/') {
+      router.push('/')
+    }
     throw error
   }
 }
@@ -121,11 +127,17 @@ service.interceptors.response.use(
           } catch (refreshError) {
             isRefreshing = false
             refreshSubscribers = []
-            ElMessage.warning('登录已过期，请重新登录')
+            clearTokens()
+            if (router.currentRoute.value.path !== '/') {
+              router.push('/')
+            }
             return Promise.reject(refreshError)
           }
         } else {
-          ElMessage.warning('登录已过期，请重新登录')
+          clearTokens()
+          if (router.currentRoute.value.path !== '/') {
+            router.push('/')
+          }
         }
       } else {
         const data = error.response.data
@@ -182,18 +194,20 @@ export const createSSEConnection = (url, handlers = {}) => {
               const newToken = await refreshTokenRequest()
               if (!isClosed) {
                 finalHeaders.Authorization = `Bearer ${newToken}`
-                connect()
-                return
+                return connect()
               }
             }
           } catch (e) {
-            if (onError) onError(new Error('Unauthorized'))
-            close()
+            if (!isClosed && onError) onError(new Error('登录已过期，请重新登录'))
+            if (!isClosed) close()
+            if (router.currentRoute.value.path !== '/') {
+              router.push('/')
+            }
             return
           }
         }
-        if (onError) onError(new Error(`HTTP error! status: ${response.status}`))
-        close()
+        if (!isClosed && onError) onError(new Error(`HTTP error! status: ${response.status}`))
+        if (!isClosed) close()
         return
       }
 

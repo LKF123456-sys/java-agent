@@ -166,23 +166,20 @@ public class UserService {
      * @return String 新生成的Access Token
      * @throws BusinessException 当Refresh Token无效或类型错误时抛出AUTH_TOKEN_INVALID异常
      */
-    public String refreshToken(@NotBlank(message = "Refresh Token不能为空") String refreshToken) {
+    public Map<String, String> refreshToken(@NotBlank(message = "Refresh Token不能为空") String refreshToken) {
         log.info("Token刷新请求");
 
-        // 步骤1：验证Refresh Token是否有效且类型正确
         if (!jwtUtil.validateRefreshToken(refreshToken)) {
             log.warn("Token刷新失败，Refresh Token无效或已过期");
             throw new BusinessException(ErrorCode.AUTH_TOKEN_INVALID);
         }
 
-        // 步骤2：验证Token类型确实为refresh（双重校验）
         String tokenType = jwtUtil.extractTokenType(refreshToken);
         if (!JwtUtil.TOKEN_TYPE_REFRESH.equals(tokenType)) {
             log.warn("Token刷新失败，Token类型错误: {}", tokenType);
             throw new BusinessException(ErrorCode.AUTH_TOKEN_INVALID);
         }
 
-        // 步骤3：从Refresh Token中提取用户信息
         Long userId = jwtUtil.extractUserId(refreshToken);
         String username = jwtUtil.extractUsername(refreshToken);
         String role = jwtUtil.extractRole(refreshToken);
@@ -192,11 +189,14 @@ public class UserService {
             throw new BusinessException(ErrorCode.AUTH_TOKEN_INVALID);
         }
 
-        // 步骤4：生成新的Access Token
         String newAccessToken = jwtUtil.generateAccessToken(userId, username, role);
-        log.info("Token刷新成功: userId={}", userId);
+        String newRefreshToken = jwtUtil.generateRefreshToken(userId, username, role);
+        log.info("Token刷新成功（双Token轮换）: userId={}", userId);
 
-        return newAccessToken;
+        Map<String, String> tokens = new HashMap<>();
+        tokens.put("accessToken", newAccessToken);
+        tokens.put("refreshToken", newRefreshToken);
+        return tokens;
     }
 
     /**
