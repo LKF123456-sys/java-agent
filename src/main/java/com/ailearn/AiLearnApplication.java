@@ -3,6 +3,10 @@ package com.ailearn; // 声明包名，com.ailearn是项目根包
 import org.mybatis.spring.annotation.MapperScan; // MyBatis-Spring注解，用于扫描Mapper接口并自动注册到Spring容器
 import org.springframework.boot.SpringApplication; // Spring Boot核心类，用于启动Spring应用程序
 import org.springframework.boot.autoconfigure.SpringBootApplication; // Spring Boot自动配置注解，包含@Configuration、@EnableAutoConfiguration、@ComponentScan三个注解的组合
+import org.springframework.boot.autoconfigure.AutoConfigurationExcludeFilter;
+import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.annotation.FilterType;
+import org.springframework.ai.vectorstore.pgvector.autoconfigure.PgVectorStoreAutoConfiguration;
 
 /**
  * 赛博AI平台（Cyber AI Platform）启动类
@@ -33,7 +37,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication; // Spring B
  * @author AiLearn Platform
  * @version 0.0.3-SNAPSHOT
  */
-@SpringBootApplication // 标记这是一个Spring Boot应用类，启用自动配置和组件扫描
+@SpringBootApplication(exclude = {PgVectorStoreAutoConfiguration.class}) // 标记这是一个Spring Boot应用类，启用自动配置和组件扫描，排除PgVectorStore自动配置避免Bean冲突
 @MapperScan("com.ailearn.mapper") // MyBatis注解，扫描com.ailearn.mapper包下的所有Mapper接口
 public class AiLearnApplication { // 应用程序主类定义
 

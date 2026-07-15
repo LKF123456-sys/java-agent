@@ -35,7 +35,7 @@
         <el-table-column prop="uploadTime" label="上传时间" width="160" :formatter="formatTime" />
         <el-table-column label="操作" width="80" fixed="right">
           <template #default="scope">
-            <el-button type="danger" size="small" :icon="Delete" @click="deleteDocument(scope.row.id)" circle />
+            <el-button type="danger" size="small" :icon="Delete" @click="deleteDocument(scope.row.docId)" circle />
           </template>
         </el-table-column>
       </el-table>
@@ -103,7 +103,7 @@ const documents = ref([])
 const currentSSE = ref(null)
 
 // 上传配置
-const uploadUrl = ref('/api/rag/upload')
+const uploadUrl = ref('/api/rag/upload/file')
 const uploadHeaders = ref({
   'Authorization': `Bearer ${userStore.token}`
 })
@@ -177,7 +177,7 @@ const refreshDocuments = async () => {
   loading.value = true
   try {
     const res = await getDocuments()
-    documents.value = res.data || []
+    documents.value = res || []
   } catch (error) {
     ElMessage.error('获取文档列表失败：' + error.message)
   } finally {
@@ -219,7 +219,7 @@ const sendMessage = async () => {
     let fullContent = ''
     let hasError = false
     
-    currentSSE.value = createSSEConnection(`/api/rag/chat?question=${encodeURIComponent(currentInput)}`, {
+    currentSSE.value = createSSEConnection(`/api/rag/ask/stream?question=${encodeURIComponent(currentInput)}`, {
       onMessage: (data) => {
         if (data.startsWith('[ERROR]')) {
           hasError = true

@@ -1,5 +1,5 @@
-&lt;?xml version="1.0" encoding="UTF-8"?&gt;
-&lt;!--
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
     Logback Spring Boot配置文件
     功能说明：
     - 控制台输出：开发环境彩色日志，包含traceId、spanId
@@ -7,158 +7,158 @@
     - JSON文件输出：使用LogstashEncoder，供ELK采集，包含traceId/spanId/userId/requestPath等MDC字段
     - 错误日志单独输出
     - 多环境Profile支持：dev（控制台+文件）、docker（控制台+JSON文件）
---&gt;
-&lt;configuration scan="true" scanPeriod="30 seconds"&gt;
+-->
+<configuration scan="true" scanPeriod="30 seconds">
 
-    &lt;!-- 定义日志文件存储路径 --&gt;
-    &lt;property name="LOG_PATH" value="${LOG_PATH:-./logs}"/&gt;
-    &lt;!-- 定义应用名称 --&gt;
-    &lt;property name="APP_NAME" value="${SPRING_APPLICATION_NAME:-cyber-ai-platform}"/&gt;
-    &lt;!-- 定义控制台彩色日志格式Pattern（含traceId、spanId） --&gt;
-    &lt;property name="CONSOLE_PATTERN"
-              value="%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){faint} %clr([%thread]){blue} %clr([%X{traceId:-}]){yellow} %clr([%X{spanId:-}]){cyan} %clr(%-5level){highlight} %clr(%logger{50}){magenta} - %msg%n"/&gt;
-    &lt;!-- 定义普通文件日志格式Pattern（含traceId、spanId） --&gt;
-    &lt;property name="FILE_PATTERN"
-              value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [%X{traceId:-}] [%X{spanId:-}] %-5level %logger{50} - %msg%n"/&gt;
+    <!-- 定义日志文件存储路径 -->
+    <property name="LOG_PATH" value="${LOG_PATH:-./logs}"/>
+    <!-- 定义应用名称 -->
+    <property name="APP_NAME" value="${SPRING_APPLICATION_NAME:-cyber-ai-platform}"/>
+    <!-- 定义控制台彩色日志格式Pattern（含traceId、spanId） -->
+    <property name="CONSOLE_PATTERN"
+              value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [%X{traceId:-}] [%X{spanId:-}] %-5level %logger{50} - %msg%n"/>
+    <!-- 定义普通文件日志格式Pattern（含traceId、spanId） -->
+    <property name="FILE_PATTERN"
+              value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [%X{traceId:-}] [%X{spanId:-}] %-5level %logger{50} - %msg%n"/>
 
-    &lt;!-- ==================== 控制台输出Appender ==================== --&gt;
-    &lt;!-- 开发环境使用彩色Pattern格式输出到控制台 --&gt;
-    &lt;appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender"&gt;
-        &lt;!-- 启用彩色输出 --&gt;
-        &lt;withJansi&gt;true&lt;/withJansi&gt;
-        &lt;encoder&gt;
-            &lt;!-- 使用包含traceId、spanId的彩色Pattern格式 --&gt;
-            &lt;pattern&gt;${CONSOLE_PATTERN}&lt;/pattern&gt;
-            &lt;!-- 设置字符编码为UTF-8 --&gt;
-            &lt;charset&gt;UTF-8&lt;/charset&gt;
-        &lt;/encoder&gt;
-    &lt;/appender&gt;
+    <!-- ==================== 控制台输出Appender ==================== -->
+    <!-- 开发环境使用彩色Pattern格式输出到控制台 -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <!-- 启用彩色输出 -->
+        <withJansi>true</withJansi>
+        <encoder>
+            <!-- 使用包含traceId、spanId的彩色Pattern格式 -->
+            <pattern>${CONSOLE_PATTERN}</pattern>
+            <!-- 设置字符编码为UTF-8 -->
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
 
-    &lt;!-- ==================== 普通文件输出Appender ==================== --&gt;
-    &lt;!-- 按天滚动生成日志文件，保留30天，单文件最大100MB，总大小上限10GB --&gt;
-    &lt;appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender"&gt;
-        &lt;!-- 当前活动日志文件路径 --&gt;
-        &lt;file&gt;${LOG_PATH}/app.log&lt;/file&gt;
-        &lt;!-- 滚动策略：基于时间和大小的滚动策略 --&gt;
-        &lt;rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy"&gt;
-            &lt;!-- 滚动后的日志文件名格式：按天命名 --&gt;
-            &lt;fileNamePattern&gt;${LOG_PATH}/app.%d{yyyy-MM-dd}.%i.log&lt;/fileNamePattern&gt;
-            &lt;!-- 单个日志文件最大大小：100MB --&gt;
-            &lt;maxFileSize&gt;100MB&lt;/maxFileSize&gt;
-            &lt;!-- 日志文件总大小上限：10GB --&gt;
-            &lt;totalSizeCap&gt;10GB&lt;/totalSizeCap&gt;
-            &lt;!-- 日志文件保留天数：30天 --&gt;
-            &lt;maxHistory&gt;30&lt;/maxHistory&gt;
-        &lt;/rollingPolicy&gt;
-        &lt;encoder&gt;
-            &lt;!-- 使用包含traceId、spanId的Pattern格式 --&gt;
-            &lt;pattern&gt;${FILE_PATTERN}&lt;/pattern&gt;
-            &lt;!-- 设置字符编码为UTF-8 --&gt;
-            &lt;charset&gt;UTF-8&lt;/charset&gt;
-        &lt;/encoder&gt;
-    &lt;/appender&gt;
+    <!-- ==================== 普通文件输出Appender ==================== -->
+    <!-- 按天滚动生成日志文件，保留30天，单文件最大100MB，总大小上限10GB -->
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <!-- 当前活动日志文件路径 -->
+        <file>${LOG_PATH}/app.log</file>
+        <!-- 滚动策略：基于时间和大小的滚动策略 -->
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <!-- 滚动后的日志文件名格式：按天命名 -->
+            <fileNamePattern>${LOG_PATH}/app.%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <!-- 单个日志文件最大大小：100MB -->
+            <maxFileSize>100MB</maxFileSize>
+            <!-- 日志文件总大小上限：10GB -->
+            <totalSizeCap>10GB</totalSizeCap>
+            <!-- 日志文件保留天数：30天 -->
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <!-- 使用包含traceId、spanId的Pattern格式 -->
+            <pattern>${FILE_PATTERN}</pattern>
+            <!-- 设置字符编码为UTF-8 -->
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
 
-    &lt;!-- ==================== JSON日志输出Appender ==================== --&gt;
-    &lt;!-- 使用LogstashEncoder输出JSON格式日志，供ELK/Loki等日志系统采集 --&gt;
-    &lt;!-- 文件命名模式：app-json-*.log，匹配Logstash采集路径配置 --&gt;
-    &lt;appender name="JSON_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender"&gt;
-        &lt;!-- 当前活动JSON日志文件路径（使用连字符命名，匹配app-json-*.log模式） --&gt;
-        &lt;file&gt;${LOG_PATH}/app-json-current.log&lt;/file&gt;
-        &lt;!-- 滚动策略：基于时间和大小的滚动策略 --&gt;
-        &lt;rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy"&gt;
-            &lt;!-- 滚动后的JSON日志文件名格式：按天命名，使用连字符分隔（app-json-yyyy-MM-dd.i.log） --&gt;
-            &lt;fileNamePattern&gt;${LOG_PATH}/app-json-%d{yyyy-MM-dd}.%i.log&lt;/fileNamePattern&gt;
-            &lt;!-- 单个JSON日志文件最大大小：100MB --&gt;
-            &lt;maxFileSize&gt;100MB&lt;/maxFileSize&gt;
-            &lt;!-- JSON日志文件总大小上限：10GB --&gt;
-            &lt;totalSizeCap&gt;10GB&lt;/totalSizeCap&gt;
-            &lt;!-- JSON日志文件保留天数：30天 --&gt;
-            &lt;maxHistory&gt;30&lt;/maxHistory&gt;
-        &lt;/rollingPolicy&gt;
-        &lt;!-- 使用LogstashEncoder输出JSON格式 --&gt;
-        &lt;encoder class="net.logstash.logback.encoder.LogstashEncoder"&gt;
-            &lt;!-- 设置字符编码为UTF-8 --&gt;
-            &lt;charset&gt;UTF-8&lt;/charset&gt;
-            &lt;!-- 配置包含的MDC字段（映射诊断上下文），这些字段会被包含在JSON输出中 --&gt;
-            &lt;includeMdcKeyName&gt;traceId&lt;/includeMdcKeyName&gt;
-            &lt;includeMdcKeyName&gt;spanId&lt;/includeMdcKeyName&gt;
-            &lt;includeMdcKeyName&gt;userId&lt;/includeMdcKeyName&gt;
-            &lt;includeMdcKeyName&gt;requestPath&lt;/includeMdcKeyName&gt;
-            &lt;includeMdcKeyName&gt;requestMethod&lt;/includeMdcKeyName&gt;
-            &lt;!-- 添加自定义字段：应用名称 --&gt;
-            &lt;customFields&gt;{"appName":"${APP_NAME}"}&lt;/customFields&gt;
-            &lt;!-- 包含时间戳 --&gt;
-            &lt;includeTimestamp&gt;true&lt;/includeTimestamp&gt;
-            &lt;!-- 包含日志级别 --&gt;
-            &lt;includeLevel&gt;true&lt;/includeLevel&gt;
-            &lt;!-- 包含线程名 --&gt;
-            &lt;includeThreadName&gt;true&lt;/includeThreadName&gt;
-            &lt;!-- 包含Logger名称 --&gt;
-            &lt;includeLoggerName&gt;true&lt;/includeLoggerName&gt;
-            &lt;!-- 包含调用位置信息（类名、方法名、行号） --&gt;
-            &lt;includeCallerData&gt;false&lt;/includeCallerData&gt;
-            &lt;!-- 包含MDC上下文 --&gt;
-            &lt;includeMdc&gt;true&lt;/includeMdc&gt;
-            &lt;!-- 时间戳格式 --&gt;
-            &lt;timestampPattern&gt;yyyy-MM-dd'T'HH:mm:ss.SSSZZ&lt;/timestampPattern&gt;
-        &lt;/encoder&gt;
-    &lt;/appender&gt;
+    <!-- ==================== JSON日志输出Appender ==================== -->
+    <!-- 使用LogstashEncoder输出JSON格式日志，供ELK/Loki等日志系统采集 -->
+    <!-- 文件命名模式：app-json-*.log，匹配Logstash采集路径配置 -->
+    <appender name="JSON_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <!-- 当前活动JSON日志文件路径（使用连字符命名，匹配app-json-*.log模式） -->
+        <file>${LOG_PATH}/app-json-current.log</file>
+        <!-- 滚动策略：基于时间和大小的滚动策略 -->
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <!-- 滚动后的JSON日志文件名格式：按天命名，使用连字符分隔（app-json-yyyy-MM-dd.i.log） -->
+            <fileNamePattern>${LOG_PATH}/app-json-%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <!-- 单个JSON日志文件最大大小：100MB -->
+            <maxFileSize>100MB</maxFileSize>
+            <!-- JSON日志文件总大小上限：10GB -->
+            <totalSizeCap>10GB</totalSizeCap>
+            <!-- JSON日志文件保留天数：30天 -->
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+        <!-- 使用LogstashEncoder输出JSON格式 -->
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <!-- 设置字符编码为UTF-8 -->
+            <charset>UTF-8</charset>
+            <!-- 配置包含的MDC字段（映射诊断上下文），这些字段会被包含在JSON输出中 -->
+            <includeMdcKeyName>traceId</includeMdcKeyName>
+            <includeMdcKeyName>spanId</includeMdcKeyName>
+            <includeMdcKeyName>userId</includeMdcKeyName>
+            <includeMdcKeyName>requestPath</includeMdcKeyName>
+            <includeMdcKeyName>requestMethod</includeMdcKeyName>
+            <!-- 添加自定义字段：应用名称 -->
+            <customFields>{"appName":"${APP_NAME}"}</customFields>
+            <!-- 包含时间戳 -->
+            <includeTimestamp>true</includeTimestamp>
+            <!-- 包含日志级别 -->
+            <includeLevel>true</includeLevel>
+            <!-- 包含线程名 -->
+            <includeThreadName>true</includeThreadName>
+            <!-- 包含Logger名称 -->
+            <includeLoggerName>true</includeLoggerName>
+            <!-- 包含调用位置信息（类名、方法名、行号） -->
+            <includeCallerData>false</includeCallerData>
+            <!-- 包含MDC上下文 -->
+            <includeMdc>true</includeMdc>
+            <!-- 时间戳格式 -->
+            <timestampPattern>yyyy-MM-dd'T'HH:mm:ss.SSSZZ</timestampPattern>
+        </encoder>
+    </appender>
 
-    &lt;!-- ==================== 错误日志单独输出Appender ==================== --&gt;
-    &lt;!-- 仅输出ERROR级别及以上的日志，单独存储在error日志文件中 --&gt;
-    &lt;appender name="ERROR_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender"&gt;
-        &lt;!-- 当前活动错误日志文件路径 --&gt;
-        &lt;file&gt;${LOG_PATH}/error.log&lt;/file&gt;
-        &lt;!-- 过滤器：仅接受ERROR级别日志 --&gt;
-        &lt;filter class="ch.qos.logback.classic.filter.ThresholdFilter"&gt;
-            &lt;!-- 设置过滤级别为ERROR，只有ERROR及以上级别日志才会被记录 --&gt;
-            &lt;level&gt;ERROR&lt;/level&gt;
-        &lt;/filter&gt;
-        &lt;!-- 滚动策略：基于时间和大小的滚动策略 --&gt;
-        &lt;rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy"&gt;
-            &lt;!-- 滚动后的错误日志文件名格式：按天命名 --&gt;
-            &lt;fileNamePattern&gt;${LOG_PATH}/error.%d{yyyy-MM-dd}.%i.log&lt;/fileNamePattern&gt;
-            &lt;!-- 单个错误日志文件最大大小：100MB --&gt;
-            &lt;maxFileSize&gt;100MB&lt;/maxFileSize&gt;
-            &lt;!-- 错误日志文件总大小上限：10GB --&gt;
-            &lt;totalSizeCap&gt;10GB&lt;/totalSizeCap&gt;
-            &lt;!-- 错误日志文件保留天数：30天 --&gt;
-            &lt;maxHistory&gt;30&lt;/maxHistory&gt;
-        &lt;/rollingPolicy&gt;
-        &lt;encoder&gt;
-            &lt;!-- 使用包含traceId、spanId的Pattern格式 --&gt;
-            &lt;pattern&gt;${FILE_PATTERN}&lt;/pattern&gt;
-            &lt;!-- 设置字符编码为UTF-8 --&gt;
-            &lt;charset&gt;UTF-8&lt;/charset&gt;
-        &lt;/encoder&gt;
-    &lt;/appender&gt;
+    <!-- ==================== 错误日志单独输出Appender ==================== -->
+    <!-- 仅输出ERROR级别及以上的日志，单独存储在error日志文件中 -->
+    <appender name="ERROR_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <!-- 当前活动错误日志文件路径 -->
+        <file>${LOG_PATH}/error.log</file>
+        <!-- 过滤器：仅接受ERROR级别日志 -->
+        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+            <!-- 设置过滤级别为ERROR，只有ERROR及以上级别日志才会被记录 -->
+            <level>ERROR</level>
+        </filter>
+        <!-- 滚动策略：基于时间和大小的滚动策略 -->
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <!-- 滚动后的错误日志文件名格式：按天命名 -->
+            <fileNamePattern>${LOG_PATH}/error.%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <!-- 单个错误日志文件最大大小：100MB -->
+            <maxFileSize>100MB</maxFileSize>
+            <!-- 错误日志文件总大小上限：10GB -->
+            <totalSizeCap>10GB</totalSizeCap>
+            <!-- 错误日志文件保留天数：30天 -->
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <!-- 使用包含traceId、spanId的Pattern格式 -->
+            <pattern>${FILE_PATTERN}</pattern>
+            <!-- 设置字符编码为UTF-8 -->
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
 
-    &lt;!-- ==================== 开发环境（dev）Profile配置 ==================== --&gt;
-    &lt;!-- 默认激活dev Profile，输出到控制台和普通文件 --&gt;
-    &lt;springProfile name="dev | default"&gt;
-        &lt;!-- 设置根日志级别为INFO（可通过logging.level.*配置覆盖） --&gt;
-        &lt;root level="INFO"&gt;
-            &lt;!-- 控制台输出 --&gt;
-            &lt;appender-ref ref="CONSOLE"/&gt;
-            &lt;!-- 普通文件输出 --&gt;
-            &lt;appender-ref ref="FILE"/&gt;
-            &lt;!-- 错误日志单独输出 --&gt;
-            &lt;appender-ref ref="ERROR_FILE"/&gt;
-        &lt;/root&gt;
-    &lt;/springProfile&gt;
+    <!-- ==================== 开发环境（dev）Profile配置 ==================== -->
+    <!-- 默认激活dev Profile，输出到控制台和普通文件 -->
+    <springProfile name="dev | default">
+        <!-- 设置根日志级别为INFO（可通过logging.level.*配置覆盖） -->
+        <root level="INFO">
+            <!-- 控制台输出 -->
+            <appender-ref ref="CONSOLE"/>
+            <!-- 普通文件输出 -->
+            <appender-ref ref="FILE"/>
+            <!-- 错误日志单独输出 -->
+            <appender-ref ref="ERROR_FILE"/>
+        </root>
+    </springProfile>
 
-    &lt;!-- ==================== Docker环境Profile配置 ==================== --&gt;
-    &lt;!-- Docker容器环境，输出到控制台和JSON文件（供ELK采集） --&gt;
-    &lt;springProfile name="docker"&gt;
-        &lt;!-- 设置根日志级别为INFO --&gt;
-        &lt;root level="INFO"&gt;
-            &lt;!-- 控制台输出 --&gt;
-            &lt;appender-ref ref="CONSOLE"/&gt;
-            &lt;!-- JSON文件输出（供ELK/Loki采集） --&gt;
-            &lt;appender-ref ref="JSON_FILE"/&gt;
-            &lt;!-- 错误日志单独输出 --&gt;
-            &lt;appender-ref ref="ERROR_FILE"/&gt;
-        &lt;/root&gt;
-    &lt;/springProfile&gt;
+    <!-- ==================== Docker环境Profile配置 ==================== -->
+    <!-- Docker容器环境，输出到控制台和JSON文件（供ELK采集） -->
+    <springProfile name="docker">
+        <!-- 设置根日志级别为INFO -->
+        <root level="INFO">
+            <!-- 控制台输出 -->
+            <appender-ref ref="CONSOLE"/>
+            <!-- JSON文件输出（供ELK/Loki采集） -->
+            <appender-ref ref="JSON_FILE"/>
+            <!-- 错误日志单独输出 -->
+            <appender-ref ref="ERROR_FILE"/>
+        </root>
+    </springProfile>
 
-&lt;/configuration&gt;
+</configuration>

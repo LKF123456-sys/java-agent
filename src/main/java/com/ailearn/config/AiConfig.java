@@ -7,6 +7,7 @@ import org.springframework.ai.vectorstore.SimpleVectorStore;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.ai.vectorstore.pgvector.PgVectorStore;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
@@ -46,9 +47,9 @@ public class AiConfig {
      * @return VectorStore 向量存储实例
      */
     @Bean
-    @Primary
     @ConditionalOnMissingBean(VectorStore.class)
-    public VectorStore vectorStore(DataSource dataSource, EmbeddingModel embeddingModel) {
+    @ConditionalOnProperty(name = "spring.ai.vectorstore.pgvector.enabled", havingValue = "false", matchIfMissing = true)
+    public VectorStore localVectorStore(DataSource dataSource, EmbeddingModel embeddingModel) {
         // 将通用DataSource强转为HikariDataSource以获取JDBC连接URL
         HikariDataSource hikariDataSource = (HikariDataSource) dataSource;
         // 获取实际的JDBC连接URL字符串

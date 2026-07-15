@@ -53,21 +53,18 @@
 </template>
 
 <script setup>
-import { ref, computed, nextTick, onUnmounted } from 'vue'
+import { ref, computed, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Document, Position, Loading } from '@element-plus/icons-vue'
 import ChatMessage from '@/components/ChatMessage.vue'
-import { createSSEConnection } from '@/api'
+import request from '@/utils/request'
 
-// 状态变量
 const messages = ref([])
 const inputMessage = ref('')
 const loading = ref(false)
 const messagesContainer = ref(null)
-const currentSSE = ref(null)
 const outputType = ref('book')
 
-// 占位符文本
 const placeholderText = computed(() => {
   switch (outputType.value) {
     case 'book':
@@ -81,7 +78,6 @@ const placeholderText = computed(() => {
   }
 })
 
-// 滚动到底部
 const scrollToBottom = () => {
   nextTick(() => {
     if (messagesContainer.value) {
@@ -90,7 +86,6 @@ const scrollToBottom = () => {
   })
 }
 
-// 发送消息
 const sendMessage = async () => {
   if (!inputMessage.value.trim() || loading.value || !outputType.value) return
   
@@ -112,48 +107,24 @@ const sendMessage = async () => {
   messages.value.push(aiMessage)
   
   try {
-    let fullContent = ''
-    let hasError = false
-    
-    currentSSE.value = createSSEConnection(`/api/structured/chat?message=${encodeURIComponent(currentInput)}&type=${outputType.value}`, {
-      onMessage: (data) => {
-        if (data.startsWith('[ERROR]')) {
-          hasError = true
-          const errorMsg = data.substring(7)
-          aiMessage.content = '抱歉，发生了错误：' + errorMsg
-          ElMessage.error(errorMsg)
-          return
-        }
-        fullContent += data
-        aiMessage.content = fullContent
-        scrollToBottom()
-      },
-      onError: (error) => {
-        if (!hasError) {
-          aiMessage.content = '抱歉，连接出错了：' + error.message
-          ElMessage.error('结构化输出请求失败')
-        }
-      },
-      onClose: () => {
-        loading.value = false
-        if (!hasError) {
-          scrollToBottom()
-        }
-      }
+    const type = outputType.value === 'person' ? 'book' : outputType.value
+    const response = await request.post(`/api/structured/extract/${type}`, {
+      content: currentInput,
+      type: outputType.value
     })
+    if (response.code === 200) {
+      aiMessage.content = JSON.stringify(response.data, null, 2)
+    } else {
+      aiMessage.content = '抱歉，结构化提取失败：' + (response.message || '未知错误')
+    }
+    scrollToBottom()
   } catch (error) {
-    aiMessage.content = '抱歉，发生了错误：' + error.message
-    loading.value = false
+    aiMessage.content = '抱歉，发生了错误：' + (error.message || '请求失败')
     ElMessage.error('结构化输出请求失败')
+  } finally {
+    loading.value = false
   }
 }
-
-// 组件卸载时关闭SSE连接
-onUnmounted(() => {
-  if (currentSSE.value) {
-    currentSSE.value.close()
-  }
-})
 </script>
 
 <style scoped>

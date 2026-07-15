@@ -83,7 +83,7 @@ const handleSendMessage = async (content) => {
       content: m.content
     }))
     
-    currentSSE = chatAPI.memoryChat(content, history, (data) => {
+    currentSSE = memoryChat(content, (data) => {
       if (data.content) {
         assistantMessage.content += data.content
         scrollToBottom()

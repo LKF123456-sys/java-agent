@@ -106,19 +106,19 @@ export const streamChat = (message, conversationId, onMessage) => {
 
 // Agent聊天API
 export const agentChat = (message, onMessage) => {
-  const url = `/api/agent/stream?message=${encodeURIComponent(message)}`
+  const url = `/api/agent/stream?task=${encodeURIComponent(message)}`
   return createStreamChat(url, onMessage)
 }
 
 // 搜索Agent聊天API
 export const searchAgentChat = (message, onMessage) => {
-  const url = `/api/search-agent/stream?message=${encodeURIComponent(message)}`
+  const url = `/api/search-agent/stream?task=${encodeURIComponent(message)}`
   return createStreamChat(url, onMessage)
 }
 
 // 多Agent聊天API
 export const multiAgentChat = (message, onMessage) => {
-  const url = `/api/multi-agent/stream?message=${encodeURIComponent(message)}`
+  const url = `/api/multi-agent/stream?task=${encodeURIComponent(message)}`
   return createMultiAgentStream(url, onMessage)
 }
 
@@ -130,25 +130,25 @@ export const memoryChat = (message, onMessage) => {
 
 // RAG聊天API
 export const ragChat = (question, onMessage) => {
-  const url = `/api/rag/chat?question=${encodeURIComponent(question)}`
+  const url = `/api/rag/ask/stream?question=${encodeURIComponent(question)}`
   return createStreamChat(url, onMessage)
 }
 
 // 会话API
-export const getConversations = () => {
-  return request.get('/api/chat/conversations')
+export const getConversations = (type = 'chat') => {
+  return request.get('/api/conversations', { params: { type } })
 }
 
 export const createConversation = (title) => {
-  return request.post('/api/chat/conversations', { title })
+  return request.post('/api/conversations', { title })
 }
 
 export const deleteConversation = (id) => {
-  return request.delete(`/api/chat/conversations/${id}`)
+  return request.delete(`/api/conversations/${id}`)
 }
 
 export const getConversationMessages = (conversationId) => {
-  return request.get(`/api/chat/conversations/${conversationId}/messages`)
+  return request.get(`/api/conversations/${conversationId}/messages`)
 }
 
 // RAG文档API
