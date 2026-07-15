@@ -1,5 +1,6 @@
 import axios from 'axios'
 import router from '@/router'
+import { ElMessage } from 'element-plus'
 
 const ACCESS_TOKEN_KEY = 'accessToken'
 const REFRESH_TOKEN_KEY = 'refreshToken'
@@ -87,6 +88,7 @@ service.interceptors.response.use(
       const error = new Error(res.message || '请求失败')
       error.code = res.code
       console.error('响应错误:', res.message)
+      ElMessage.error(res.message || '请求失败')
       return Promise.reject(error)
     }
   },
@@ -96,36 +98,44 @@ service.interceptors.response.use(
     if (error.response) {
       const { status } = error.response
 
-      if (status === 401 && !originalRequest._retry) {
-        if (isRefreshing) {
-          return new Promise(resolve => {
-            subscribeTokenRefresh(newToken => {
-              originalRequest.headers.Authorization = `Bearer ${newToken}`
-              resolve(service(originalRequest))
+      if (status === 401) {
+        if (!originalRequest._retry) {
+          if (isRefreshing) {
+            return new Promise(resolve => {
+              subscribeTokenRefresh(newToken => {
+                originalRequest.headers.Authorization = `Bearer ${newToken}`
+                resolve(service(originalRequest))
+              })
             })
-          })
+          }
+
+          originalRequest._retry = true
+          isRefreshing = true
+
+          try {
+            const newToken = await refreshTokenRequest()
+            isRefreshing = false
+            onTokenRefreshed(newToken)
+            originalRequest.headers.Authorization = `Bearer ${newToken}`
+            return service(originalRequest)
+          } catch (refreshError) {
+            isRefreshing = false
+            refreshSubscribers = []
+            ElMessage.warning('登录已过期，请重新登录')
+            return Promise.reject(refreshError)
+          }
+        } else {
+          ElMessage.warning('登录已过期，请重新登录')
         }
-
-        originalRequest._retry = true
-        isRefreshing = true
-
-        try {
-          const newToken = await refreshTokenRequest()
-          isRefreshing = false
-          onTokenRefreshed(newToken)
-          originalRequest.headers.Authorization = `Bearer ${newToken}`
-          return service(originalRequest)
-        } catch (refreshError) {
-          isRefreshing = false
-          refreshSubscribers = []
-          return Promise.reject(refreshError)
+      } else {
+        const data = error.response.data
+        if (data && data.message) {
+          error.message = data.message
         }
+        ElMessage.error(error.message || '请求失败')
       }
-
-      const data = error.response.data
-      if (data && data.message) {
-        error.message = data.message
-      }
+    } else {
+      ElMessage.error(error.message || '网络错误')
     }
 
     console.error('网络错误:', error)

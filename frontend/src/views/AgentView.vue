@@ -1,212 +1,158 @@
 <template>
   <div class="agent-page">
-    <div class="agent-layout">
-      <div class="agent-sidebar">
-        <div class="sidebar-header">
-          <h2 class="sidebar-title cyber-glow-text">🤖 智能体</h2>
+    <el-row :gutter="0" style="height: 100%">
+      <el-col :span="6" class="config-sidebar">
+        <div class="config-section">
+          <h3 class="section-title">选择 Agent 类型</h3>
+          <el-select v-model="selectedAgent" placeholder="请选择Agent类型" style="width: 100%">
+            <el-option
+              v-for="agent in agentTypes"
+              :key="agent.value"
+              :label="agent.label"
+              :value="agent.value"
+            >
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <el-icon><component :is="agent.icon" /></el-icon>
+                <span>{{ agent.label }}</span>
+              </div>
+            </el-option>
+          </el-select>
         </div>
-        
-        <div class="agent-list cyber-scrollbar">
-          <div 
-            v-for="agent in agents" 
-            :key="agent.id"
-            class="agent-item"
-            :class="{ active: selectedAgent === agent.id }"
-            @click="selectAgent(agent.id)"
-          >
-            <div class="agent-icon">{{ agent.icon }}</div>
-            <div class="agent-info">
-              <h3 class="agent-name">{{ agent.name }}</h3>
-              <p class="agent-desc">{{ agent.description }}</p>
-            </div>
-          </div>
-        </div>
-      </div>
 
-      <div class="chat-area">
+        <div class="config-section">
+          <h3 class="section-title">Agent 说明</h3>
+          <el-card shadow="never" class="agent-info-card">
+            <p v-if="currentAgentInfo">{{ currentAgentInfo.description }}</p>
+            <el-empty v-else description="请选择一个Agent类型" :image-size="80" />
+          </el-card>
+        </div>
+      </el-col>
+
+      <el-col :span="18" class="chat-main">
         <div class="chat-header">
-          <div class="header-info">
-            <h2 class="chat-title" v-if="currentAgent">
-              {{ currentAgent.icon }} {{ currentAgent.name }}
-            </h2>
-            <div v-if="streaming" class="streaming-indicator">
-              <span class="typing-dot"></span>
-              <span class="typing-dot"></span>
-              <span class="typing-dot"></span>
-              <span class="streaming-text">{{ currentAgent?.name || 'Agent' }} 正在工作...</span>
-            </div>
-          </div>
+          <h2 class="chat-title">
+            <el-icon><MagicStick /></el-icon>
+            {{ currentAgentInfo?.label || '智能 Agent' }}
+          </h2>
+          <el-tag v-if="isLoading" type="primary" effect="light">
+            <el-icon class="is-loading"><Loading /></el-icon>
+            Agent 正在思考...
+          </el-tag>
         </div>
 
-        <div class="messages-container cyber-scrollbar" ref="messagesRef">
-          <div v-if="messages.length === 0" class="empty-messages">
-            <div class="empty-icon">{{ currentAgent?.icon || '🤖' }}</div>
-            <p class="empty-title">{{ currentAgent?.name || '选择一个智能体' }}</p>
-            <p class="empty-desc">{{ currentAgent?.description || '从左侧选择一个智能体开始对话' }}</p>
-            <div v-if="currentAgent" class="capabilities">
-              <span v-for="cap in currentAgent.capabilities" :key="cap" class="capability-tag">
-                {{ cap }}
-              </span>
-            </div>
-          </div>
+        <el-alert
+          title="此页面为智能Agent对话，Agent具备工具调用能力"
+          type="info"
+          :closable="false"
+          style="margin: 16px 24px 0"
+        />
 
+        <el-scrollbar ref="messagesRef" class="messages-container">
+          <el-empty v-if="messages.length === 0" description="开始与专业Agent对话">
+            <template #image>
+              <el-icon :size="64" color="#409EFF"><MagicStick /></el-icon>
+            </template>
+          </el-empty>
+          
           <ChatMessage 
-            v-for="(message, index) in messages" 
-            :key="index" 
+            v-for="message in messages" 
+            :key="message.id" 
             :message="message" 
           />
-        </div>
+        </el-scrollbar>
 
-        <ChatInput @send="sendMessage" :disabled="streaming || !selectedAgent" />
-      </div>
-    </div>
+        <ChatInput @send="handleSendMessage" :disabled="isLoading || !selectedAgent" placeholder="请选择Agent类型后输入消息..." />
+      </el-col>
+    </el-row>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick, onUnmounted } from 'vue'
+import { ref, computed, nextTick, watch, onUnmounted } from 'vue'
+import { MagicStick, EditPen, Document, Reading, DataAnalysis, Loading } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 import ChatMessage from '@/components/ChatMessage.vue'
 import ChatInput from '@/components/ChatInput.vue'
-import request, { createSSEConnection } from '@/utils/request'
+import { agentChat } from '@/api'
 
-const agents = ref([
-  {
-    id: 'coder',
-    name: '代码助手',
-    icon: '💻',
-    description: '专业的编程助手，帮助编写、调试和优化代码',
-    capabilities: ['代码生成', 'Bug修复', '代码审查', '技术解答']
-  },
-  {
-    id: 'writer',
-    name: '写作助手',
-    icon: '✍️',
-    description: '帮助您进行文章写作、内容创作和文案润色',
-    capabilities: ['文章写作', '文案创作', '内容润色', '风格调整']
-  },
-  {
-    id: 'translator',
-    name: '翻译专家',
-    icon: '🌐',
-    description: '多语言翻译助手，支持中英文互译及多语言翻译',
-    capabilities: ['中英互译', '多语言支持', '专业术语', '语境理解']
-  },
-  {
-    id: 'analyst',
-    name: '数据分析师',
-    icon: '📊',
-    description: '数据分析和可视化专家，帮助解读数据和生成报告',
-    capabilities: ['数据分析', '趋势预测', '报告生成', '洞察建议']
-  }
-])
-
-const selectedAgent = ref(null)
+const selectedAgent = ref('')
 const messages = ref([])
-const streaming = ref(false)
+const isLoading = ref(false)
 const messagesRef = ref(null)
-let sseConnection = null
+let currentSSE = null
 
-const currentAgent = computed(() => {
-  return agents.value.find(a => a.id === selectedAgent.value)
+const agentTypes = [
+  { value: 'code', label: '代码助手', description: '专业代码助手，解答编程问题、代码审查、优化建议', icon: EditPen },
+  { value: 'writer', label: '写作助手', description: '内容创作助手，文章、文案、创意写作', icon: Document },
+  { value: 'translator', label: '翻译助手', description: '多语言翻译支持', icon: Reading },
+  { value: 'analyst', label: '数据分析助手', description: '数据分析、统计洞察、报告生成', icon: DataAnalysis }
+]
+
+const currentAgentInfo = computed(() => {
+  return agentTypes.find(a => a.value === selectedAgent.value)
 })
 
 const scrollToBottom = () => {
   nextTick(() => {
     if (messagesRef.value) {
-      messagesRef.value.scrollTop = messagesRef.value.scrollHeight
+      messagesRef.value.scrollTo({ top: messagesRef.value.wrapRef.scrollHeight, behavior: 'smooth' })
     }
   })
 }
 
 const closeSSE = () => {
-  if (sseConnection) {
-    sseConnection.close()
-    sseConnection = null
+  if (currentSSE) {
+    currentSSE.close()
+    currentSSE = null
   }
+  isLoading.value = false
 }
 
-const selectAgent = (agentId) => {
-  closeSSE()
-  selectedAgent.value = agentId
-  messages.value = []
-}
-
-const agentPrompts = {
-  coder: '你是一位专业的编程助手，请帮助用户编写、调试和优化代码。请用中文回答。\n\n用户问题：',
-  writer: '你是一位专业的写作助手，请帮助用户进行文章写作、内容创作和文案润色。请用中文回答。\n\n用户需求：',
-  translator: '你是一位专业的翻译专家，请提供准确的多语言翻译服务，支持中英文互译。请用中文回答。\n\n翻译请求：',
-  analyst: '你是一位专业的数据分析师，请帮助用户分析数据、解读趋势并提供洞察建议。请用中文回答。\n\n分析需求：'
-}
-
-const startSSE = (message) => {
-  const agentId = selectedAgent.value
-  const promptPrefix = agentPrompts[agentId] || ''
-  const fullTask = promptPrefix + message
-  let url = `/api/agent/stream?task=${encodeURIComponent(fullTask)}`
-
-  let hasError = false
-
-  sseConnection = createSSEConnection(url, {
-    onMessage: (data) => {
-      if (!data) return
-      
-      if (data.startsWith('[ERROR]')) {
-        hasError = true
-        const lastMsg = messages.value[messages.value.length - 1]
-        if (lastMsg && lastMsg.role === 'assistant') {
-          lastMsg.content = '错误: ' + data.substring(7)
-        }
-        streaming.value = false
-        closeSSE()
-        return
-      }
-
-      const lastMsg = messages.value[messages.value.length - 1]
-      if (lastMsg && lastMsg.role === 'assistant') {
-        lastMsg.content += data
-        scrollToBottom()
-      }
-    },
-    onError: () => {
-      if (!hasError) {
-        const lastMsg = messages.value[messages.value.length - 1]
-        if (lastMsg && lastMsg.role === 'assistant' && !lastMsg.content) {
-          lastMsg.content = '连接失败，请检查后端服务是否启动'
-        }
-      }
-      streaming.value = false
-      closeSSE()
-    },
-    onClose: () => {
-      streaming.value = false
-    }
-  })
-}
-
-const sendMessage = (content) => {
-  if (!content.trim() || streaming.value || !selectedAgent.value) return
+const handleSendMessage = async (content) => {
+  if (!selectedAgent.value) {
+    ElMessage.warning('请先选择Agent类型')
+    return
+  }
 
   closeSSE()
-  streaming.value = true
-
-  messages.value.push({
+  
+  const userMessage = {
+    id: Date.now().toString(),
     role: 'user',
-    content: content.trim()
-  })
+    content
+  }
+  messages.value.push(userMessage)
 
-  messages.value.push({
+  const assistantMessage = {
+    id: (Date.now() + 1).toString(),
     role: 'assistant',
     content: ''
-  })
+  }
+  messages.value.push(assistantMessage)
 
+  isLoading.value = true
   scrollToBottom()
-  startSSE(content.trim())
+
+  try {
+    currentSSE = agentChat(content, (data) => {
+      if (data.content) {
+        assistantMessage.content += data.content
+        scrollToBottom()
+      }
+    })
+    await currentSSE
+  } catch (error) {
+    console.error('Agent chat error:', error)
+    assistantMessage.content = '发生错误，请重试'
+    ElMessage.error('发送消息失败')
+  } finally {
+    isLoading.value = false
+    closeSSE()
+  }
 }
 
-onMounted(() => {
-  if (agents.value.length > 0) {
-    selectAgent(agents.value[0].id)
-  }
+watch(selectedAgent, () => {
+  messages.value = []
 })
 
 onUnmounted(() => {
@@ -216,197 +162,66 @@ onUnmounted(() => {
 
 <style scoped>
 .agent-page {
-  height: calc(100vh - 48px);
-  margin: -24px;
+  height: calc(100vh - 108px);
+  background: #fff;
+  border-radius: 8px;
+  overflow: hidden;
 }
 
-.agent-layout {
-  display: flex;
+.config-sidebar {
+  background: #f5f7fa;
+  border-right: 1px solid #e4e7ed;
   height: 100%;
-}
-
-.agent-sidebar {
-  width: 280px;
-  min-width: 280px;
-  background: var(--cyber-bg-secondary);
-  border-right: 1px solid var(--cyber-border);
-  display: flex;
-  flex-direction: column;
-  position: relative;
-}
-
-.agent-sidebar::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 1px;
-  height: 100%;
-  background: linear-gradient(180deg, var(--cyber-cyan), var(--cyber-magenta), var(--cyber-cyan));
-  opacity: 0.5;
-}
-
-.sidebar-header {
-  padding: 20px;
-  border-bottom: 1px solid var(--cyber-border);
-}
-
-.sidebar-title {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--cyber-cyan);
-  margin: 0;
-  letter-spacing: 1px;
-}
-
-.agent-list {
-  flex: 1;
+  padding: 24px;
   overflow-y: auto;
-  padding: 12px;
 }
 
-.agent-item {
-  display: flex;
-  gap: 12px;
-  padding: 16px;
-  margin-bottom: 8px;
-  color: var(--cyber-text-secondary);
-  cursor: pointer;
-  border: 1px solid transparent;
-  transition: all 0.3s ease;
-  position: relative;
-  clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
+.config-section {
+  margin-bottom: 24px;
 }
 
-.agent-item:hover {
-  background: rgba(0, 255, 255, 0.05);
-  color: var(--cyber-cyan);
-}
-
-.agent-item.active {
-  background: rgba(0, 255, 255, 0.1);
-  border-color: var(--cyber-cyan);
-  color: var(--cyber-cyan);
-  box-shadow: var(--cyber-shadow-cyan);
-}
-
-.agent-icon {
-  font-size: 28px;
-  flex-shrink: 0;
-}
-
-.agent-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.agent-name {
+.section-title {
   font-size: 14px;
   font-weight: 600;
-  margin: 0 0 4px 0;
-  letter-spacing: 0.5px;
+  color: #303133;
+  margin: 0 0 12px 0;
 }
 
-.agent-desc {
-  font-size: 11px;
-  color: var(--cyber-text-muted);
-  margin: 0;
-  line-height: 1.4;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+.agent-info-card {
+  font-size: 13px;
+  color: #606266;
 }
 
-.chat-area {
-  flex: 1;
+:deep(.agent-info-card .el-card__body) {
+  padding: 16px;
+}
+
+.chat-main {
+  height: 100%;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
-  background: var(--cyber-bg-primary);
 }
 
 .chat-header {
-  padding: 20px 24px;
-  border-bottom: 1px solid var(--cyber-border);
-  background: var(--cyber-bg-secondary);
-}
-
-.header-info {
+  padding: 16px 24px;
+  border-bottom: 1px solid #e4e7ed;
   display: flex;
   align-items: center;
-  gap: 16px;
+  justify-content: space-between;
 }
 
 .chat-title {
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--cyber-cyan);
+  font-size: 18px;
+  font-weight: 600;
+  color: #303133;
   margin: 0;
-  letter-spacing: 2px;
-}
-
-.streaming-indicator {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.streaming-text {
-  font-size: 12px;
-  color: var(--cyber-text-muted);
-  letter-spacing: 1px;
-}
-
 .messages-container {
   flex: 1;
-  overflow-y: auto;
   padding: 24px;
-}
-
-.empty-messages {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  color: var(--cyber-text-muted);
-  text-align: center;
-}
-
-.empty-icon {
-  font-size: 64px;
-  margin-bottom: 20px;
-  opacity: 0.5;
-}
-
-.empty-title {
-  font-size: 18px;
-  color: var(--cyber-cyan);
-  margin-bottom: 8px;
-  letter-spacing: 2px;
-}
-
-.empty-desc {
-  font-size: 13px;
-  letter-spacing: 1px;
-  margin-bottom: 24px;
-}
-
-.capabilities {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  justify-content: center;
-}
-
-.capability-tag {
-  padding: 8px 14px;
-  background: rgba(255, 0, 255, 0.1);
-  border: 1px solid var(--cyber-magenta);
-  border-radius: 4px;
-  font-size: 12px;
-  color: var(--cyber-magenta);
-  clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
 }
 </style>

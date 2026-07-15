@@ -31,10 +31,10 @@ spring:
     show-sql: false
     database-platform: org.hibernate.dialect.H2Dialect
 
-  # SQL初始化：使用测试专用schema
+  # SQL初始化：测试环境不自动初始化
   sql:
     init:
-      mode: always
+      mode: never
       continue-on-error: true
       encoding: UTF-8
 
@@ -45,6 +45,20 @@ spring:
       - org.springframework.ai.vectorstore.pgvector.autoconfigure.PgVectorStoreAutoConfiguration
       - org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration
       - org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
+
+  # ==================== Spring AI配置（测试环境禁用Ollama和PgVector） ====================
+  ai:
+    ollama:
+      base-url: http://localhost:11434
+      chat:
+        options:
+          model: qwen2.5:7b
+      embedding:
+        options:
+          model: nomic-embed-text
+    vectorstore:
+      pgvector:
+        enabled: false
 
 # ==================== MyBatis-Plus配置 ====================
 mybatis-plus:
@@ -60,7 +74,9 @@ mybatis-plus:
 
 # ==================== JWT配置（测试用固定密钥） ====================
 jwt:
-  secret: test-jwt-secret-key-for-unit-testing-only-please-do-not-use-in-production-0123456789
+  secret: test-secret-key-for-unit-testing-must-be-at-least-256-bits-long-enough
+  expiration: 86400000
+  refresh-expiration: 604800000
   access-token-expiration: 3600000
   refresh-token-expiration: 86400000
   token-prefix: Bearer
@@ -106,8 +122,3 @@ logging:
     org.springframework.test: INFO
     org.hibernate: WARN
     com.baomidou.mybatisplus: WARN
-
-# ==================== 禁用Spring Security（单元测试单独测试安全组件） ====================
-security:
-  basic:
-    enabled: false

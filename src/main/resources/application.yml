@@ -51,6 +51,8 @@ spring:
       mode: always
       continue-on-error: true
       encoding: UTF-8
+      # 默认使用MySQL schema，docker profile下会覆盖为PostgreSQL
+      schema-locations: classpath:schema.sql
 
   # ==================== Spring AI 配置 ====================
   ai:
@@ -77,10 +79,11 @@ spring:
         type: SYNC
         sse-message-endpoint: /mcp/message
 
-  # 默认禁用PgVector自动配置（由AiConfig根据数据源类型手动控制）
-  autoconfigure:
-    exclude:
-      - org.springframework.ai.vectorstore.pgvector.autoconfigure.PgVectorStoreAutoConfiguration
+    # PgVector向量存储配置（默认禁用，仅在docker profile中启用）
+    # 本地开发环境使用SimpleVectorStore内存存储
+    vectorstore:
+      pgvector:
+        enabled: false
 
 # ==================== MyBatis-Plus配置 ====================
 mybatis-plus:
@@ -203,9 +206,21 @@ management:
       enabled: true
     build:
       enabled: true
+  # ==================== 分布式链路追踪配置 ====================
+  tracing:
+    # 采样配置
+    sampling:
+      # 采样概率：开发环境设置为1.0表示全采样（100%采样），生产环境可调整为0.1等较低值
+      probability: 1.0
 
 # ==================== 日志配置 ====================
 logging:
+  # 日志文件路径配置
+  file:
+    # 日志文件存储路径
+    path: ${LOG_PATH:./logs}
+    # 主日志文件名（logback-spring.xml中已配置具体的滚动策略，此处作为默认配置）
+    name: ${LOG_PATH:./logs}/app.log
   level:
     # Spring AI框架日志（INFO级别减少噪音）
     org.springframework.ai: INFO
@@ -218,8 +233,10 @@ logging:
     # Resilience4j限流日志
     io.github.resilience4j: INFO
   pattern:
-    # 控制台日志格式（包含traceId）
-    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [%X{traceId:-}] %-5level %logger{50} - %msg%n"
+    # 控制台日志格式（包含traceId和spanId，具体彩色格式已在logback-spring.xml中配置）
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [%X{traceId:-}] [%X{spanId:-}] %-5level %logger{50} - %msg%n"
+    # 文件日志格式（包含traceId和spanId，具体格式已在logback-spring.xml中配置）
+    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [%X{traceId:-}] [%X{spanId:-}] %-5level %logger{50} - %msg%n"
 
 # ==================== 应用自定义信息（Actuator info端点） ====================
 info:
@@ -245,36 +262,81 @@ spring:
     activate:
       on-profile: docker
 
-  # 生产环境使用PostgreSQL + PgVector
+  # ==================== SQL初始化：使用PostgreSQL兼容的schema ====================
+  sql:
+    init:
+      schema-locations: classpath:schema-postgresql.sql
+
+  # ==================== 数据源配置：PostgreSQL + PgVector ====================
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://postgres:5432/ai_learn}
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://postgres-pgvector:5432/ai_learn}
     username: ${SPRING_DATASOURCE_USERNAME:postgres}
     password: ${SPRING_DATASOURCE_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 30
       minimum-idle: 10
+      connection-test-query: SELECT 1
 
-  # Docker环境Ollama地址
+  # ==================== Spring AI 配置 ====================
   ai:
+    # Ollama连接地址
     ollama:
       base-url: ${SPRING_AI_OLLAMA_BASE_URL:http://ollama:11434}
+      chat:
+        enabled: true
+        options:
+          model: ${SPRING_AI_OLLAMA_CHAT_OPTIONS_MODEL:qwen2.5:7b}
+          temperature: 0.7
+          num-ctx: 8192
+      embedding:
+        enabled: true
+        options:
+          model: ${SPRING_AI_OLLAMA_EMBEDDING_OPTIONS_MODEL:nomic-embed-text}
 
-# Docker环境JWT密钥必须从环境变量传入
+    # ==================== PgVector向量存储配置（启用） ====================
+    vectorstore:
+      pgvector:
+        # 启用PgVector向量存储
+        enabled: ${SPRING_AI_VECTORSTORE_PGVECTOR_ENABLED:true}
+        # 向量索引类型：HNSW（高效近似最近邻搜索）
+        index-type: ${SPRING_AI_VECTORSTORE_PGVECTOR_INDEX_TYPE:hnsw}
+        # 向量维度：nomic-embed-text模型为768维
+        dimensions: ${SPRING_AI_VECTORSTORE_PGVECTOR_DIMENSIONS:768}
+        # 距离类型：余弦距离（适合文本语义匹配）
+        distance-type: ${SPRING_AI_VECTORSTORE_PGVECTOR_DISTANCE_TYPE:cosine_distance}
+        # 自动初始化schema（首次启动创建表和索引）
+        initialize-schema: true
+
+# ==================== JWT配置 ====================
 jwt:
+  # JWT签名密钥：从环境变量JWT_SECRET获取（生产环境必须设置强密钥）
   secret: ${JWT_SECRET}
   access-token-expiration: ${JWT_ACCESS_EXPIRATION:7200000}
   refresh-token-expiration: ${JWT_REFRESH_EXPIRATION:604800000}
 
-# 生产环境日志级别
+# ==================== 日志配置（引用logback-spring.xml中的docker profile） ====================
 logging:
+  # 指定logback配置文件位置（Spring Boot默认自动加载classpath:logback-spring.xml）
+  config: classpath:logback-spring.xml
+  # 日志文件路径（容器内路径）
+  file:
+    path: ${LOG_PATH:/app/logs}
+  # 日志级别配置
   level:
-    com.ailearn: INFO
+    com.ailearn: ${LOG_LEVEL:INFO}
     org.springframework.ai: WARN
+    org.springframework.security: WARN
+    org.apache.ibatis: WARN
 
-# 生产环境关闭Swagger（安全考虑，可按需开启）
+# ==================== API文档配置：生产环境关闭 ====================
 springdoc:
   api-docs:
-    enabled: false
+    enabled: ${SPRINGDOC_ENABLED:false}
   swagger-ui:
-    enabled: false
+    enabled: ${SWAGGER_ENABLED:false}
+
+# ==================== MyBatis-Plus日志配置：生产环境关闭SQL日志 ====================
+mybatis-plus:
+  configuration:
+    log-impl: org.apache.ibatis.logging.nologging.NoLoggingImpl

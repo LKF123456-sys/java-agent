@@ -1,353 +1,152 @@
 # ============================================================
-# 赛博AI平台 - Docker Compose 完整配置
+# 赛博AI平台 - Docker Compose 生产级配置
 # 服务组成：
-#   1. PostgreSQL + PgVector - 向量数据库（默认启用）
-#   2. MySQL - 关系型数据库（可选，通过profile启用）
-#   3. Ollama - 本地大模型服务（可选，通过profile启用）
-#   4. App - Spring Boot应用服务
-# 功能特性：
-#   - 服务健康检查与依赖控制
-#   - 数据持久化卷
-#   - 环境变量配置
-#   - 网络隔离
-#   - GPU支持（Ollama）
+#   1. postgres-pgvector - PostgreSQL + PgVector向量数据库
+#   2. elasticsearch - Elasticsearch搜索引擎
+#   3. logstash - Logstash日志收集管道
+#   4. kibana - Kibana日志可视化面板
+#   5. ollama - 本地大模型服务
+#   6. app - Spring Boot应用服务
 # 使用说明：
-#   - 基础启动（PostgreSQL + App）：docker-compose up -d
-#   - 启动MySQL：docker-compose --profile mysql up -d
-#   - 启动Ollama：docker-compose --profile ollama up -d
-#   - 全栈启动：docker-compose --profile mysql --profile ollama up -d
+#   - 全栈启动：docker-compose up -d
+#   - 查看应用日志：docker-compose logs -f app
+#   - 停止所有服务：docker-compose down
 # ============================================================
 
 version: '3.8'
 
-# ==================== 服务定义 ====================
 services:
-
   # ==================== PostgreSQL + PgVector 向量数据库服务 ====================
-  postgres:
+  postgres-pgvector:
     image: pgvector/pgvector:pg16
-    container_name: cyber-ai-postgres
-    restart: unless-stopped
+    container_name: cyber-postgres
     environment:
-      # 数据库配置（通过环境变量设置，支持自定义）
-      POSTGRES_DB: ${POSTGRES_DB:-ai_learn}
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      # 设置时区为上海
-      TZ: Asia/Shanghai
-      # PostgreSQL性能调优参数
-      PGDATA: /var/lib/postgresql/data/pgdata
+      POSTGRES_DB: ai_learn
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "5432:5432"
     volumes:
       # 数据持久化卷
       - postgres_data:/var/lib/postgresql/data
-      # 初始化SQL脚本（首次启动时自动执行）
-      - ./src/main/resources/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
-      # PostgreSQL自定义配置（可选，如需调优可挂载）
-      # - ./docker/postgres/postgresql.conf:/etc/postgresql/postgresql.conf:ro
     # 健康检查：使用pg_isready命令检查数据库是否就绪
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-ai_learn}"]
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 20s
-    # 资源限制（根据实际情况调整）
-    deploy:
-      resources:
-        limits:
-          cpus: '2.0'
-          memory: 2G
-        reservations:
-          cpus: '0.5'
-          memory: 512M
     networks:
-      - cyber-ai-network
+      - cyber-network
 
-  # ==================== MySQL 关系型数据库服务（可选） ====================
-  mysql:
-    image: mysql:8.0
-    container_name: cyber-ai-mysql
-    restart: unless-stopped
-    # 通过profile控制是否启动：需要时使用 --profile mysql 启动
-    profiles:
-      - mysql
+  # ==================== Elasticsearch 搜索引擎服务 ====================
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.0
+    container_name: cyber-elasticsearch
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-ai_learn}
-      MYSQL_USER: ${MYSQL_USER:-ailearn}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-ailearn123}
-      # 字符集配置
-      MYSQL_CHARACTER_SET_SERVER: utf8mb4
-      MYSQL_COLLATION_SERVER: utf8mb4_unicode_ci
-      # 时区设置
-      TZ: Asia/Shanghai
+      - discovery.type=single-node
+      # 禁用安全认证（生产环境建议启用）
+      - xpack.security.enabled=false
+      # JVM堆内存配置
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
     ports:
-      - "${MYSQL_PORT:-3306}:3306"
+      - "9200:9200"
     volumes:
-      # 数据持久化卷
-      - mysql_data:/var/lib/mysql
-      # MySQL配置文件（可选，用于性能调优）
-      # - ./docker/mysql/my.cnf:/etc/mysql/conf.d/my.cnf:ro
-      # 初始化脚本目录（可选）
-      # - ./docker/mysql/init:/docker-entrypoint-initdb.d:ro
-    # 健康检查：使用mysqladmin ping检查数据库状态
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u${MYSQL_ROOT_PASSWORD:-root}", "-p${MYSQL_ROOT_PASSWORD:-root}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-    command:
-      # MySQL性能调优参数
-      - --default-authentication-plugin=mysql_native_password
-      - --character-set-server=utf8mb4
-      - --collation-server=utf8mb4_unicode_ci
-      - --max_connections=200
-      - --max_allowed_packet=64M
-      - --innodb_buffer_pool_size=1G
-    deploy:
-      resources:
-        limits:
-          cpus: '2.0'
-          memory: 2G
-        reservations:
-          cpus: '0.5'
-          memory: 512M
+      # Elasticsearch数据持久化卷
+      - es_data:/usr/share/elasticsearch/data
     networks:
-      - cyber-ai-network
+      - cyber-network
 
-  # ==================== Ollama 本地大模型服务（可选） ====================
+  # ==================== Logstash 日志收集服务 ====================
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.13.0
+    container_name: cyber-logstash
+    volumes:
+      # Logstash管道配置文件
+      - ./docker/logstash/pipeline:/usr/share/logstash/pipeline
+      # Logstash全局配置文件
+      - ./docker/logstash/config:/usr/share/logstash/config
+      # 挂载应用日志目录，只读模式供Logstash读取
+      - ./logs:/app/logs:ro
+    depends_on:
+      - elasticsearch
+    networks:
+      - cyber-network
+
+  # ==================== Kibana 日志可视化服务 ====================
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.13.0
+    container_name: cyber-kibana
+    ports:
+      - "5601:5601"
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    depends_on:
+      - elasticsearch
+    networks:
+      - cyber-network
+
+  # ==================== Ollama 本地大模型服务 ====================
   ollama:
     image: ollama/ollama:latest
-    container_name: cyber-ai-ollama
-    restart: unless-stopped
-    # 通过profile控制是否启动：需要时使用 --profile ollama 启动
-    profiles:
-      - ollama
+    container_name: cyber-ollama
     ports:
-      - "${OLLAMA_PORT:-11434}:11434"
+      - "11434:11434"
     volumes:
-      # 模型数据持久化卷（模型文件较大，必须持久化）
+      # 模型数据持久化卷
       - ollama_data:/root/.ollama
-    environment:
-      - TZ=Asia/Shanghai
-      # Ollama配置
-      - OLLAMA_HOST=0.0.0.0:11434
-      # 并发请求数（根据GPU显存调整）
-      - OLLAMA_NUM_PARALLEL=2
-      # 最大加载模型数（根据显存调整）
-      - OLLAMA_MAX_LOADED_MODELS=1
-      # 是否启用调试日志
-      - OLLAMA_DEBUG=${OLLAMA_DEBUG:-false}
-    # GPU支持配置（需要NVIDIA Docker runtime）
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
-    # 健康检查：访问Ollama API版本端点
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:11434/api/version"]
-      interval: 15s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
-    # 如需CPU模式运行，注释掉上面的deploy部分，取消下面注释
-    # deploy:
-    #   resources:
-    #     limits:
-    #       cpus: '4.0'
-    #       memory: 8G
-    #     reservations:
-    #       cpus: '1.0'
-    #       memory: 2G
     networks:
-      - cyber-ai-network
-
-  # ==================== 应用初始化服务（拉取Ollama模型，可选） ====================
-  ollama-init:
-    image: curlimages/curl:latest
-    container_name: cyber-ai-ollama-init
-    depends_on:
-      ollama:
-        condition: service_healthy
-    profiles:
-      - ollama
-      - ollama-init
-    # 启动后自动拉取默认模型（可按需修改模型名称）
-    # 注意：拉取模型需要较长时间和较大磁盘空间，请确保网络和磁盘充足
-    entrypoint: >
-      sh -c "
-        echo 'Waiting for Ollama to be ready...' &&
-        curl -X POST http://ollama:11434/api/pull -d '{\"name\": \"${OLLAMA_CHAT_MODEL:-qwen2.5:7b}\"}' &&
-        curl -X POST http://ollama:11434/api/pull -d '{\"name\": \"${OLLAMA_EMBEDDING_MODEL:-nomic-embed-text}\"}' &&
-        echo 'Models pulled successfully!'
-      "
-    networks:
-      - cyber-ai-network
+      - cyber-network
 
   # ==================== Spring Boot 应用服务 ====================
   app:
     build:
       context: .
-      dockerfile: Dockerfile
-      # 构建参数
-      args:
-        - BUILDKIT_INLINE_CACHE=1
-    image: cyber-ai-platform:latest
-    container_name: cyber-ai-app
-    restart: unless-stopped
+      dockerfile: docker/app/Dockerfile
+    container_name: cyber-app
     ports:
-      - "${APP_PORT:-8080}:8080"
+      - "8080:8080"
     environment:
-      # ==================== Spring 基础配置 ====================
-      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-docker}
-      TZ: Asia/Shanghai
-      SERVER_PORT: 8080
-
-      # ==================== 数据源配置（PostgreSQL默认） ====================
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-ai_learn}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
-
-      # ==================== JWT配置（生产环境务必修改JWT_SECRET为强密钥） ====================
-      JWT_SECRET: ${JWT_SECRET:-cyber-ai-platform-jwt-secret-key-change-in-production-docker-env-please-use-strong-key}
-      JWT_ACCESS_EXPIRATION: ${JWT_ACCESS_EXPIRATION:-7200000}
-      JWT_REFRESH_EXPIRATION: ${JWT_REFRESH_EXPIRATION:-604800000}
-
+      # ==================== Spring Profile配置 ====================
+      - SPRING_PROFILES_ACTIVE=docker
+      # ==================== 数据源配置（PostgreSQL + PgVector） ====================
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-pgvector:5432/ai_learn
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=postgres
+      - SPRING_DATASOURCE_DRIVER_CLASS_NAME=org.postgresql.Driver
       # ==================== Ollama AI配置 ====================
-      SPRING_AI_OLLAMA_BASE_URL: http://ollama:11434
-      SPRING_AI_OLLAMA_CHAT_ENABLED: "true"
-      SPRING_AI_OLLAMA_CHAT_OPTIONS_MODEL: ${OLLAMA_CHAT_MODEL:-qwen2.5:7b}
-      SPRING_AI_OLLAMA_CHAT_OPTIONS_TEMPERATURE: ${OLLAMA_TEMPERATURE:-0.7}
-      SPRING_AI_OLLAMA_EMBEDDING_ENABLED: "true"
-      SPRING_AI_OLLAMA_EMBEDDING_OPTIONS_MODEL: ${OLLAMA_EMBEDDING_MODEL:-nomic-embed-text}
-
+      - SPRING_AI_OLLAMA_BASE_URL=http://ollama:11434
+      - SPRING_AI_OLLAMA_CHAT_OPTIONS_MODEL=qwen2.5:7b
+      - SPRING_AI_OLLAMA_EMBEDDING_OPTIONS_MODEL=nomic-embed-text
       # ==================== PgVector向量存储配置 ====================
-      SPRING_AI_VECTORSTORE_PGVECTOR_INDEX_TYPE: hnsw
-      SPRING_AI_VECTORSTORE_PGVECTOR_DIMENSIONS: ${PGVECTOR_DIMENSIONS:-768}
-      SPRING_AI_VECTORSTORE_PGVECTOR_DISTANCE_TYPE: cosine_distance
-
-      # ==================== 日志级别配置 ====================
-      LOG_LEVEL: ${LOG_LEVEL:-INFO}
-
-      # ==================== JVM参数（通过JAVA_OPTS传递） ====================
-      JAVA_OPTS: >-
-        -Xms${JVM_XMS:-512m}
-        -Xmx${JVM_XMX:-2g}
-        -XX:+UseG1GC
-        -XX:MaxGCPauseMillis=200
-        -XX:+HeapDumpOnOutOfMemoryError
-        -XX:HeapDumpPath=/app/logs/heapdump.hprof
-        -Djava.security.egd=file:/dev/./urandom
-
-      # ==================== API文档开关（生产环境建议关闭） ====================
-      SPRINGDOC_ENABLED: ${SPRINGDOC_ENABLED:-false}
-      SWAGGER_ENABLED: ${SWAGGER_ENABLED:-false}
+      - SPRING_AI_VECTORSTORE_PGVECTOR_ENABLED=true
+      # ==================== JWT配置（生产环境务必修改为强密钥） ====================
+      - JWT_SECRET=your-production-jwt-secret-key-must-be-at-least-256-bits-long-for-production-security
+      # ==================== Tavily联网搜索API Key ====================
+      - TAVILY_API_KEY=${TAVILY_API_KEY:-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}
+      # ==================== Swagger/API文档开关（生产环境关闭） ====================
+      - SWAGGER_ENABLED=false
     volumes:
-      # 应用日志持久化
-      - app_logs:/app/logs
-      # 文件上传目录（如需持久化上传文件）
-      # - app_uploads:/app/uploads
-    # 依赖服务健康检查：等待PostgreSQL健康后再启动应用
+      # 应用日志持久化（供Logstash采集）
+      - ./logs:/app/logs
+      # 文件上传目录持久化
+      - ./uploads:/app/uploads
     depends_on:
-      postgres:
+      postgres-pgvector:
         condition: service_healthy
-      # 如果使用Ollama，取消下面注释确保Ollama先启动
-      # ollama:
-      #   condition: service_healthy
-      #   required: false
-    # 应用健康检查：使用Spring Boot Actuator端点
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 90s
-    deploy:
-      resources:
-        limits:
-          cpus: '4.0'
-          memory: 4G
-        reservations:
-          cpus: '0.5'
-          memory: 1G
+      elasticsearch:
+        condition: service_started
+      ollama:
+        condition: service_started
     networks:
-      - cyber-ai-network
+      - cyber-network
 
 # ==================== 数据卷定义（持久化存储） ====================
 volumes:
-  # PostgreSQL数据卷
   postgres_data:
-    name: cyber-ai-postgres-data
-  # MySQL数据卷
-  mysql_data:
-    name: cyber-ai-mysql-data
-  # Ollama模型数据卷
+  es_data:
   ollama_data:
-    name: cyber-ai-ollama-data
-  # 应用日志卷
-  app_logs:
-    name: cyber-ai-app-logs
 
 # ==================== 网络定义 ====================
 networks:
-  cyber-ai-network:
-    name: cyber-ai-network
+  cyber-network:
     driver: bridge
-    # 网络配置（可根据需要调整）
-    driver_opts:
-      com.docker.network.bridge.name: cyber-ai-br0
-    ipam:
-      config:
-        - subnet: 172.28.0.0/16
-
-# ============================================================
-# 环境变量说明（可通过.env文件或环境变量设置）：
-#
-# 数据库配置：
-#   POSTGRES_DB - PostgreSQL数据库名（默认：ai_learn）
-#   POSTGRES_USER - PostgreSQL用户名（默认：postgres）
-#   POSTGRES_PASSWORD - PostgreSQL密码（默认：postgres）
-#   POSTGRES_PORT - PostgreSQL端口映射（默认：5432）
-#   MYSQL_ROOT_PASSWORD - MySQL root密码（默认：root）
-#   MYSQL_DATABASE - MySQL数据库名（默认：ai_learn）
-#   MYSQL_USER - MySQL用户名（默认：ailearn）
-#   MYSQL_PASSWORD - MySQL用户密码（默认：ailearn123）
-#   MYSQL_PORT - MySQL端口映射（默认：3306）
-#
-# AI模型配置：
-#   OLLAMA_PORT - Ollama端口映射（默认：11434）
-#   OLLAMA_CHAT_MODEL - 聊天模型（默认：qwen2.5:7b）
-#   OLLAMA_EMBEDDING_MODEL - 嵌入模型（默认：nomic-embed-text）
-#   OLLAMA_TEMPERATURE - 模型温度参数（默认：0.7）
-#   PGVECTOR_DIMENSIONS - 向量维度（默认：768，与嵌入模型匹配）
-#
-# 应用配置：
-#   APP_PORT - 应用端口映射（默认：8080）
-#   JWT_SECRET - JWT签名密钥（生产环境必须修改！）
-#   JWT_ACCESS_EXPIRATION - Access Token过期时间（毫秒）
-#   JWT_REFRESH_EXPIRATION - Refresh Token过期时间（毫秒）
-#   SPRING_PROFILES_ACTIVE - Spring Profile（默认：docker）
-#   LOG_LEVEL - 日志级别（默认：INFO）
-#   SPRINGDOC_ENABLED - 是否启用API文档（默认：false）
-#   SWAGGER_ENABLED - 是否启用Swagger UI（默认：false）
-#
-# JVM配置：
-#   JVM_XMS - JVM初始堆内存（默认：512m）
-#   JVM_XMX - JVM最大堆内存（默认：2g）
-#
-# 常用命令：
-#   启动基础服务：docker-compose up -d
-#   启动并查看日志：docker-compose up -d && docker-compose logs -f app
-#   停止所有服务：docker-compose down
-#   停止并删除数据卷：docker-compose down -v（注意：会删除所有数据！）
-#   重新构建应用：docker-compose build --no-cache app
-#   查看服务状态：docker-compose ps
-#   查看应用日志：docker-compose logs -f --tail=100 app
-# ============================================================

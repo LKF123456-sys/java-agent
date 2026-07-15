@@ -1,14 +1,14 @@
 <template>
-    <div class="chat-page">
-      <div class="conversation-sidebar">
+  <div class="chat-page">
+    <el-row :gutter="0" style="height: 100%">
+      <el-col :span="6" class="conversation-sidebar">
         <div class="sidebar-header">
-          <button class="cyber-btn new-chat-btn" @click="handleNewConversation">
-            <span class="btn-icon">+</span>
-            <span>新建对话</span>
-          </button>
+          <el-button type="primary" class="new-chat-btn" @click="handleNewConversation">
+            <el-icon><Plus /></el-icon>
+            新建对话
+          </el-button>
         </div>
-        
-        <div class="conversation-list cyber-scrollbar">
+        <el-scrollbar class="conversation-list">
           <div 
             v-for="conv in chatStore.conversations" 
             :key="conv.id"
@@ -16,54 +16,57 @@
             :class="{ active: chatStore.currentConversation?.id === conv.id }"
             @click="handleSelectConversation(conv.id)"
           >
-            <span class="conv-icon">◆</span>
+            <el-icon class="conv-icon"><ChatDotRound /></el-icon>
             <span class="conv-title">{{ conv.title || '新对话' }}</span>
-            <button class="delete-btn" @click.stop="handleDeleteConversation(conv.id)">
-              <span>×</span>
-            </button>
+            <el-button 
+              type="danger" 
+              link 
+              class="delete-btn" 
+              @click.stop="handleDeleteConversation(conv.id)"
+            >
+              <el-icon><Delete /></el-icon>
+            </el-button>
           </div>
           
-          <div v-if="chatStore.conversations.length === 0" class="empty-conversations">
-            <p>暂无对话记录</p>
-            <p class="hint">点击上方按钮新建对话</p>
-          </div>
-        </div>
-      </div>
+          <el-empty v-if="chatStore.conversations.length === 0" description="暂无对话记录" />
+        </el-scrollbar>
+      </el-col>
 
-      <div class="chat-main">
+      <el-col :span="18" class="chat-main">
         <div class="chat-header">
-          <h2 class="chat-title cyber-glow-text">
+          <h2 class="chat-title">
             {{ chatStore.currentConversation?.title || '基础聊天' }}
           </h2>
-          <div v-if="chatStore.isStreaming" class="streaming-indicator">
-            <span class="typing-dot"></span>
-            <span class="typing-dot"></span>
-            <span class="typing-dot"></span>
-            <span class="streaming-text">AI 正在回复...</span>
-          </div>
+          <el-tag v-if="chatStore.isStreaming" type="primary" effect="light">
+            <el-icon class="is-loading"><Loading /></el-icon>
+            AI 正在回复...
+          </el-tag>
         </div>
 
-        <div class="messages-container cyber-scrollbar" ref="messagesRef">
-          <div v-if="chatStore.messages.length === 0" class="empty-messages">
-            <div class="empty-icon">💬</div>
-            <p class="empty-title">开始对话</p>
-            <p class="empty-desc">在下方输入消息，与AI进行智能对话</p>
-          </div>
+        <el-scrollbar ref="messagesRef" class="messages-container">
+          <el-empty v-if="chatStore.messages.length === 0" description="开始对话，与AI进行智能对话">
+            <template #image>
+              <el-icon :size="64" color="#409EFF"><ChatDotRound /></el-icon>
+            </template>
+          </el-empty>
           
           <ChatMessage 
             v-for="message in chatStore.messages" 
             :key="message.id" 
             :message="message" 
           />
-        </div>
+        </el-scrollbar>
 
         <ChatInput @send="handleSendMessage" />
-      </div>
-    </div>
+      </el-col>
+    </el-row>
+  </div>
 </template>
 
 <script setup>
 import { ref, onMounted, nextTick, watch, onUnmounted } from 'vue'
+import { Plus, ChatDotRound, Delete, Loading } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import ChatMessage from '@/components/ChatMessage.vue'
 import ChatInput from '@/components/ChatInput.vue'
 import { useChatStore } from '@/stores/chat'
@@ -74,7 +77,7 @@ const messagesRef = ref(null)
 const scrollToBottom = () => {
   nextTick(() => {
     if (messagesRef.value) {
-      messagesRef.value.scrollTop = messagesRef.value.scrollHeight
+      messagesRef.value.scrollTo({ top: messagesRef.value.wrapRef.scrollHeight, behavior: 'smooth' })
     }
   })
 }
@@ -83,6 +86,7 @@ const handleNewConversation = async () => {
   try {
     await chatStore.createConversation()
   } catch (error) {
+    ElMessage.error('创建对话失败')
     console.error('创建对话失败:', error)
   }
 }
@@ -92,18 +96,27 @@ const handleSelectConversation = async (conversationId) => {
     await chatStore.selectConversation(conversationId)
     scrollToBottom()
   } catch (error) {
+    ElMessage.error('加载对话失败')
     console.error('加载对话失败:', error)
   }
 }
 
 const handleDeleteConversation = async (conversationId) => {
   try {
+    await ElMessageBox.confirm('确定要删除这个对话吗？', '提示', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
     await chatStore.deleteConversation(conversationId)
     if (chatStore.conversations.length > 0) {
       await handleSelectConversation(chatStore.conversations[0].id)
     }
+    ElMessage.success('删除成功')
   } catch (error) {
-    console.error('删除对话失败:', error)
+    if (error !== 'cancel') {
+      console.error('删除对话失败:', error)
+    }
   }
 }
 
@@ -112,6 +125,7 @@ const handleSendMessage = async (content) => {
     await chatStore.sendMessage(content)
     scrollToBottom()
   } catch (error) {
+    ElMessage.error('发送消息失败')
     console.error('发送消息失败:', error)
   }
 }
@@ -142,215 +156,102 @@ onUnmounted(() => {
 
 <style scoped>
 .chat-page {
-  display: flex;
-  height: calc(100vh - 48px);
-  margin: -24px;
+  height: calc(100vh - 108px);
+  background: #fff;
+  border-radius: 8px;
+  overflow: hidden;
 }
 
 .conversation-sidebar {
-  width: 280px;
-  min-width: 280px;
-  background: var(--cyber-bg-secondary);
-  border-right: 1px solid var(--cyber-border);
+  background: #f5f7fa;
+  border-right: 1px solid #e4e7ed;
+  height: 100%;
   display: flex;
   flex-direction: column;
-  position: relative;
-}
-
-.conversation-sidebar::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 1px;
-  height: 100%;
-  background: linear-gradient(180deg, var(--cyber-cyan), var(--cyber-magenta), var(--cyber-cyan));
-  opacity: 0.5;
 }
 
 .sidebar-header {
-  padding: 20px;
-  border-bottom: 1px solid var(--cyber-border);
+  padding: 16px;
+  border-bottom: 1px solid #e4e7ed;
 }
 
 .new-chat-btn {
   width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 14px;
-}
-
-.btn-icon {
-  font-size: 18px;
-  font-weight: 700;
 }
 
 .conversation-list {
   flex: 1;
-  overflow-y: auto;
-  padding: 12px;
+  padding: 8px;
 }
 
 .conversation-item {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 14px 16px;
-  margin-bottom: 6px;
-  color: var(--cyber-text-secondary);
+  gap: 8px;
+  padding: 12px;
+  margin-bottom: 4px;
+  border-radius: 4px;
   cursor: pointer;
-  border: 1px solid transparent;
-  transition: all 0.3s ease;
-  position: relative;
-  clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
+  transition: all 0.3s;
 }
 
 .conversation-item:hover {
-  background: rgba(0, 255, 255, 0.05);
-  color: var(--cyber-cyan);
+  background: #ecf5ff;
 }
 
 .conversation-item.active {
-  background: rgba(0, 255, 255, 0.1);
-  border-color: var(--cyber-cyan);
-  color: var(--cyber-cyan);
-  box-shadow: var(--cyber-shadow-cyan);
+  background: #409EFF;
+  color: white;
 }
 
 .conv-icon {
-  font-size: 8px;
-  color: var(--cyber-text-muted);
-  transition: all 0.3s ease;
   flex-shrink: 0;
-}
-
-.conversation-item.active .conv-icon,
-.conversation-item:hover .conv-icon {
-  color: var(--cyber-cyan);
-  text-shadow: 0 0 10px var(--cyber-cyan);
 }
 
 .conv-title {
   flex: 1;
-  font-size: 13px;
+  font-size: 14px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  letter-spacing: 0.5px;
 }
 
-.delete-btn {
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  border: none;
-  color: var(--cyber-text-muted);
-  font-size: 18px;
-  cursor: pointer;
+.conversation-item .delete-btn {
   opacity: 0;
-  transition: all 0.3s ease;
-  border-radius: 4px;
-  flex-shrink: 0;
+  padding: 4px;
 }
 
 .conversation-item:hover .delete-btn {
   opacity: 1;
 }
 
-.delete-btn:hover {
-  background: rgba(255, 0, 128, 0.2);
-  color: var(--cyber-pink);
-}
-
-.empty-conversations {
-  text-align: center;
-  padding: 40px 20px;
-  color: var(--cyber-text-muted);
-}
-
-.empty-conversations p {
-  font-size: 13px;
-  margin-bottom: 8px;
-}
-
-.empty-conversations .hint {
-  font-size: 11px;
-  color: var(--cyber-text-muted);
-  opacity: 0.7;
+.conversation-item.active .delete-btn {
+  color: white;
 }
 
 .chat-main {
-  flex: 1;
+  height: 100%;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
-  background: var(--cyber-bg-primary);
 }
 
 .chat-header {
-  padding: 20px 24px;
-  border-bottom: 1px solid var(--cyber-border);
-  background: var(--cyber-bg-secondary);
+  padding: 16px 24px;
+  border-bottom: 1px solid #e4e7ed;
   display: flex;
   align-items: center;
   justify-content: space-between;
 }
 
 .chat-title {
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--cyber-cyan);
-  letter-spacing: 2px;
+  font-size: 18px;
+  font-weight: 600;
+  color: #303133;
   margin: 0;
-}
-
-.streaming-indicator {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.streaming-text {
-  font-size: 12px;
-  color: var(--cyber-text-muted);
-  letter-spacing: 1px;
 }
 
 .messages-container {
   flex: 1;
-  overflow-y: auto;
   padding: 24px;
-}
-
-.empty-messages {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  color: var(--cyber-text-muted);
-}
-
-.empty-icon {
-  font-size: 64px;
-  margin-bottom: 20px;
-  opacity: 0.5;
-}
-
-.empty-title {
-  font-size: 18px;
-  color: var(--cyber-cyan);
-  margin-bottom: 8px;
-  letter-spacing: 2px;
-}
-
-.empty-desc {
-  font-size: 13px;
-  letter-spacing: 1px;
 }
 </style>

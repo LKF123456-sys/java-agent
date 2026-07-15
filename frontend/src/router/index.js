@@ -11,7 +11,7 @@ import ToolsView from '../views/ToolsView.vue'
 import MultiAgentView from '../views/MultiAgentView.vue'
 import McpView from '../views/McpView.vue'
 
-const publicRoutes = ['Home']
+const publicPaths = ['/', '/login']
 
 const routes = [
   {
@@ -85,7 +85,7 @@ router.beforeEach((to, from, next) => {
   const isLoggedIn = userStore.isLoggedIn
 
   if (to.meta.requiresAuth && !isLoggedIn) {
-    next({ name: 'Home' })
+    next({ path: '/' })
   } else {
     next()
   }
