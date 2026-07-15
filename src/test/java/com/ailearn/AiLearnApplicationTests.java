@@ -1,38 +1,21 @@
-package com.ailearn;
+package com.ailearn; // 声明包名
 
-import org.junit.jupiter.api.Disabled;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
+import org.junit.jupiter.api.Disabled; // JUnit禁用注解
+import org.junit.jupiter.api.DisplayName; // JUnit显示名称注解
+import org.junit.jupiter.api.Test; // JUnit测试方法注解
+import org.springframework.boot.test.context.SpringBootTest; // Spring Boot测试注解
+import org.springframework.test.context.ActiveProfiles; // Spring激活profile注解
 
-/**
- * Spring Boot应用启动测试类
- * 验证Spring Context能够正常加载
- * 使用test profile，使用H2内存数据库，不依赖外部MySQL/Ollama服务
- *
- * 注意：核心业务逻辑的单元测试请查看对应的*Test类：
- * - JwtUtilTest: JWT工具类测试
- * - UserServiceTest: 用户服务测试
- * - ConversationServiceTest: 会话服务测试
- * - ChatServiceTest: 聊天服务测试
- *
- * @author AiLearn Platform
- */
-@Disabled("需要完整Spring上下文、logback配置等，在CI单元测试环境中禁用。核心业务逻辑已有独立单元测试覆盖。")
-@SpringBootTest
-@ActiveProfiles("test")
-@DisplayName("Spring Boot应用启动测试（禁用）")
-class AiLearnApplicationTests {
+@Disabled("需要完整Spring上下文、logback配置等，在CI单元测试环境中禁用。核心业务逻辑已有独立单元测试覆盖。") // 禁用此测试类
+@SpringBootTest // Spring Boot测试注解
+@ActiveProfiles("test") // 激活test profile
+@DisplayName("Spring Boot应用启动测试（禁用）") // 测试类显示名称
+class AiLearnApplicationTests { // 应用启动测试类
 
-    /**
-     * 测试Spring Context能够正常加载
-     * 验证所有Bean能够正确创建和注入，应用程序上下文启动成功
-     */
     @Test
     @DisplayName("应用上下文加载测试")
-    void contextLoads() {
+    void contextLoads() { // 测试上下文加载
         // 验证 Spring Context 能正常启动
         // 如果Context加载失败，此测试会失败
-    }
-}
+    } // contextLoads方法结束
+} // AiLearnApplicationTests类结束

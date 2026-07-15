@@ -1,8 +1,8 @@
-package com.ailearn;
+package com.ailearn; // 声明包名，com.ailearn是项目根包
 
-import org.mybatis.spring.annotation.MapperScan;
-import org.springframework.boot.SpringApplication;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.mybatis.spring.annotation.MapperScan; // MyBatis-Spring注解，用于扫描Mapper接口并自动注册到Spring容器
+import org.springframework.boot.SpringApplication; // Spring Boot核心类，用于启动Spring应用程序
+import org.springframework.boot.autoconfigure.SpringBootApplication; // Spring Boot自动配置注解，包含@Configuration、@EnableAutoConfiguration、@ComponentScan三个注解的组合
 
 /**
  * 赛博AI平台（Cyber AI Platform）启动类
@@ -33,9 +33,9 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  * @author AiLearn Platform
  * @version 0.0.3-SNAPSHOT
  */
-@SpringBootApplication
-@MapperScan("com.ailearn.mapper")
-public class AiLearnApplication {
+@SpringBootApplication // 标记这是一个Spring Boot应用类，启用自动配置和组件扫描
+@MapperScan("com.ailearn.mapper") // MyBatis注解，扫描com.ailearn.mapper包下的所有Mapper接口
+public class AiLearnApplication { // 应用程序主类定义
 
     /**
      * 应用程序入口方法
@@ -43,7 +43,7 @@ public class AiLearnApplication {
      *
      * @param args 命令行启动参数
      */
-    public static void main(String[] args) {
-        SpringApplication.run(AiLearnApplication.class, args);
-    }
-}
+    public static void main(String[] args) { // Java程序入口方法，main方法是所有Java应用的起点
+        SpringApplication.run(AiLearnApplication.class, args); // 启动Spring Boot应用，传入主类和命令行参数
+    } // main方法结束
+} // AiLearnApplication类结束

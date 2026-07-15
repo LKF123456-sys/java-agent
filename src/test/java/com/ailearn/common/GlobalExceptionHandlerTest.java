@@ -1,191 +1,113 @@
-package com.ailearn.common;
+package com.ailearn.common; // 声明包名
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
-import org.springframework.http.MediaType;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import com.fasterxml.jackson.databind.ObjectMapper; // Jackson JSON序列化/反序列化类
+import org.junit.jupiter.api.BeforeEach; // JUnit前置方法注解
+import org.junit.jupiter.api.DisplayName; // JUnit显示名称注解
+import org.junit.jupiter.api.Test; // JUnit测试方法注解
+import org.springframework.http.MediaType; // Spring MediaType常量类
+import org.springframework.test.web.servlet.MockMvc; // Spring MockMvc类，模拟HTTP请求
+import org.springframework.test.web.servlet.setup.MockMvcBuilders; // Spring MockMvc构建器
+import org.springframework.web.bind.annotation.GetMapping; // Spring GET映射注解
+import org.springframework.web.bind.annotation.RequestParam; // Spring请求参数注解
+import org.springframework.web.bind.annotation.RestController; // Spring REST控制器注解
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.junit.jupiter.api.Assertions.*; // JUnit断言静态导入
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get; // MockMvc GET请求构建器
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*; // MockMvc结果匹配器
 
-/**
- * 全局异常处理器单元测试
- * 使用独立MockMvc测试GlobalExceptionHandler对各种异常的处理
- * 创建一个测试Controller来抛出不同类型的异常进行验证
- *
- * @author AiLearn Platform
- */
-@DisplayName("全局异常处理器测试")
-class GlobalExceptionHandlerTest {
+@DisplayName("全局异常处理器测试") // 测试类显示名称
+class GlobalExceptionHandlerTest { // 全局异常处理器测试类
 
-    /**
-     * MockMvc实例，用于模拟HTTP请求
-     */
-    private MockMvc mockMvc;
+    private MockMvc mockMvc; // MockMvc实例
 
-    /**
-     * Jackson ObjectMapper，用于JSON解析
-     */
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper = new ObjectMapper(); // Jackson ObjectMapper
 
-    /**
-     * 测试用Controller，用于抛出各种异常
-     */
-    @RestController
-    static class TestController {
+    @RestController // 测试用Controller，用于抛出各种异常
+    static class TestController { // 测试控制器静态内部类
 
-        /**
-         * 抛出BusinessException的接口
-         */
-        @GetMapping("/test/business-error")
-        public void throwBusinessError() {
-            throw new BusinessException(ErrorCode.AUTH_ACCESS_DENIED);
-        }
+        @GetMapping("/test/business-error") // 测试业务异常接口
+        public void throwBusinessError() { // 抛出BusinessException的方法
+            throw new BusinessException(ErrorCode.AUTH_ACCESS_DENIED); // 抛出权限不足异常
+        } // throwBusinessError方法结束
 
-        /**
-         * 抛出IllegalArgumentException的接口
-         */
-        @GetMapping("/test/illegal-arg")
-        public void throwIllegalArg(@RequestParam String value) {
-            throw new IllegalArgumentException("参数非法: " + value);
-        }
+        @GetMapping("/test/illegal-arg") // 测试非法参数异常接口
+        public void throwIllegalArg(@RequestParam String value) { // 抛出IllegalArgumentException的方法
+            throw new IllegalArgumentException("参数非法: " + value); // 抛出非法参数异常
+        } // throwIllegalArg方法结束
 
-        /**
-         * 抛出RuntimeException的接口
-         */
-        @GetMapping("/test/runtime-error")
-        public void throwRuntimeError() {
-            throw new RuntimeException("系统运行时错误");
-        }
+        @GetMapping("/test/runtime-error") // 测试运行时异常接口
+        public void throwRuntimeError() { // 抛出RuntimeException的方法
+            throw new RuntimeException("系统运行时错误"); // 抛出运行时异常
+        } // throwRuntimeError方法结束
 
-        /**
-         * 正常返回的接口
-         */
-        @GetMapping("/test/ok")
-        public Result<String> ok() {
-            return Result.success("ok");
-        }
-    }
+        @GetMapping("/test/ok") // 测试正常接口
+        public Result<String> ok() { // 正常返回方法
+            return Result.success("ok"); // 返回成功
+        } // ok方法结束
+    } // TestController类结束
 
-    /**
-     * 每个测试方法执行前初始化MockMvc
-     * 注册GlobalExceptionHandler和测试Controller
-     */
-    @BeforeEach
-    void setUp() {
-        // 构建独立MockMvc，注册异常处理器和测试Controller
-        mockMvc = MockMvcBuilders.standaloneSetup(new TestController())
-                .setControllerAdvice(new GlobalExceptionHandler())
-                .build();
-    }
+    @BeforeEach // 每个测试前执行
+    void setUp() { // 初始化方法
+        mockMvc = MockMvcBuilders.standaloneSetup(new TestController()) // 构建独立MockMvc
+                .setControllerAdvice(new GlobalExceptionHandler()) // 注册全局异常处理器
+                .build(); // 构建MockMvc
+    } // setUp方法结束
 
-    /**
-     * 测试BusinessException异常处理
-     * 验证：返回HTTP 200，body包含正确的错误码和消息
-     */
     @Test
     @DisplayName("处理BusinessException - 业务异常返回正确错误码")
-    void testHandleBusinessException() throws Exception {
-        // 执行：请求抛出BusinessException的接口
-        mockMvc.perform(get("/test/business-error")
-                        .contentType(MediaType.APPLICATION_JSON))
-                // 验证：HTTP状态为200（业务异常正常返回）
-                .andExpect(status().isOk())
-                // 验证：返回JSON格式
-                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                // 验证：错误码正确
-                .andExpect(jsonPath("$.code").value(ErrorCode.AUTH_ACCESS_DENIED.getCode()))
-                // 验证：错误消息正确
-                .andExpect(jsonPath("$.message").value(ErrorCode.AUTH_ACCESS_DENIED.getMessage()));
-    }
+    void testHandleBusinessException() throws Exception { // 测试业务异常处理
+        mockMvc.perform(get("/test/business-error") // 执行GET请求
+                        .contentType(MediaType.APPLICATION_JSON)) // 设置Content-Type
+                .andExpect(status().isOk()) // 期望HTTP 200
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON)) // 期望JSON响应
+                .andExpect(jsonPath("$.code").value(ErrorCode.AUTH_ACCESS_DENIED.getCode())) // 期望错误码正确
+                .andExpect(jsonPath("$.message").value(ErrorCode.AUTH_ACCESS_DENIED.getMessage())); // 期望错误消息正确
+    } // testHandleBusinessException方法结束
 
-    /**
-     * 测试IllegalArgumentException异常处理
-     * 验证：返回HTTP 400，包含错误消息
-     */
     @Test
     @DisplayName("处理IllegalArgumentException - 非法参数返回400")
-    void testHandleIllegalArgumentException() throws Exception {
-        // 执行：请求抛出IllegalArgumentException的接口
-        mockMvc.perform(get("/test/illegal-arg")
-                        .param("value", "test")
-                        .contentType(MediaType.APPLICATION_JSON))
-                // 验证：HTTP状态为400
-                .andExpect(status().isBadRequest())
-                // 验证：返回JSON格式
-                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                // 验证：错误码为参数校验失败
-                .andExpect(jsonPath("$.code").value(ErrorCode.SYSTEM_PARAM_VALIDATION_ERROR.getCode()))
-                // 验证：错误消息包含异常消息
-                .andExpect(jsonPath("$.message").value("参数非法: test"));
-    }
+    void testHandleIllegalArgumentException() throws Exception { // 测试非法参数异常处理
+        mockMvc.perform(get("/test/illegal-arg") // 执行GET请求
+                        .param("value", "test") // 设置请求参数
+                        .contentType(MediaType.APPLICATION_JSON)) // 设置Content-Type
+                .andExpect(status().isBadRequest()) // 期望HTTP 400
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON)) // 期望JSON响应
+                .andExpect(jsonPath("$.code").value(ErrorCode.SYSTEM_PARAM_VALIDATION_ERROR.getCode())) // 期望参数校验错误码
+                .andExpect(jsonPath("$.message").value("参数非法: test")); // 期望错误消息包含具体信息
+    } // testHandleIllegalArgumentException方法结束
 
-    /**
-     * 测试通用Exception异常处理
-     * 验证：返回HTTP 500，包含系统内部错误
-     */
     @Test
     @DisplayName("处理Exception - 未知异常返回500系统错误")
-    void testHandleGenericException() throws Exception {
-        // 执行：请求抛出RuntimeException的接口
-        mockMvc.perform(get("/test/runtime-error")
-                        .contentType(MediaType.APPLICATION_JSON))
-                // 验证：HTTP状态为500
-                .andExpect(status().isInternalServerError())
-                // 验证：返回JSON格式
-                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                // 验证：错误码为系统内部错误
-                .andExpect(jsonPath("$.code").value(ErrorCode.SYSTEM_INTERNAL_ERROR.getCode()))
-                // 验证：错误消息为系统内部错误
-                .andExpect(jsonPath("$.message").value(ErrorCode.SYSTEM_INTERNAL_ERROR.getMessage()));
-    }
+    void testHandleGenericException() throws Exception { // 测试通用异常处理
+        mockMvc.perform(get("/test/runtime-error") // 执行GET请求
+                        .contentType(MediaType.APPLICATION_JSON)) // 设置Content-Type
+                .andExpect(status().isInternalServerError()) // 期望HTTP 500
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON)) // 期望JSON响应
+                .andExpect(jsonPath("$.code").value(ErrorCode.SYSTEM_INTERNAL_ERROR.getCode())) // 期望系统内部错误码
+                .andExpect(jsonPath("$.message").value(ErrorCode.SYSTEM_INTERNAL_ERROR.getMessage())); // 期望系统内部错误消息
+    } // testHandleGenericException方法结束
 
-    /**
-     * 测试正常请求不被异常处理器干扰
-     * 验证：正常请求正常返回
-     */
     @Test
     @DisplayName("正常请求 - 正常返回不被拦截")
-    void testNormalRequest() throws Exception {
-        // 执行：请求正常接口
-        mockMvc.perform(get("/test/ok")
-                        .contentType(MediaType.APPLICATION_JSON))
-                // 验证：HTTP状态为200
-                .andExpect(status().isOk())
-                // 验证：返回code为200
-                .andExpect(jsonPath("$.code").value(200))
-                // 验证：返回数据为ok
-                .andExpect(jsonPath("$.data").value("ok"))
-                // 验证：消息为success
-                .andExpect(jsonPath("$.message").value("success"));
-    }
+    void testNormalRequest() throws Exception { // 测试正常请求
+        mockMvc.perform(get("/test/ok") // 执行GET请求
+                        .contentType(MediaType.APPLICATION_JSON)) // 设置Content-Type
+                .andExpect(status().isOk()) // 期望HTTP 200
+                .andExpect(jsonPath("$.code").value(200)) // 期望code为200
+                .andExpect(jsonPath("$.data").value("ok")) // 期望data为ok
+                .andExpect(jsonPath("$.message").value("success")); // 期望message为success
+    } // testNormalRequest方法结束
 
-    /**
-     * 测试BusinessException带详细信息
-     * 验证：错误消息包含详细信息
-     */
     @Test
     @DisplayName("处理BusinessException - 带详细信息的异常")
-    void testHandleBusinessExceptionWithDetail() throws Exception {
-        // 创建一个带detail的BusinessException（通过额外接口或直接测试handler方法）
-        // 由于使用standaloneSetup，我们直接验证handler方法的返回
-        GlobalExceptionHandler handler = new GlobalExceptionHandler();
-        BusinessException ex = new BusinessException(ErrorCode.USER_NOT_FOUND, "用户ID: 999");
+    void testHandleBusinessExceptionWithDetail() throws Exception { // 测试带详细信息的业务异常
+        GlobalExceptionHandler handler = new GlobalExceptionHandler(); // 创建异常处理器
+        BusinessException ex = new BusinessException(ErrorCode.USER_NOT_FOUND, "用户ID: 999"); // 创建带详细信息的异常
 
-        // 直接调用handler方法
-        Result<Void> result = handler.handleBusinessException(ex);
+        Result<Void> result = handler.handleBusinessException(ex); // 直接调用handler方法
 
-        // 验证：错误码正确
-        assertEquals(ErrorCode.USER_NOT_FOUND.getCode(), result.getCode());
-        // 验证：消息包含详细信息
-        assertTrue(result.getMessage().contains(ErrorCode.USER_NOT_FOUND.getMessage()));
-        assertTrue(result.getMessage().contains("用户ID: 999"));
-    }
-}
+        assertEquals(ErrorCode.USER_NOT_FOUND.getCode(), result.getCode()); // 错误码正确
+        assertTrue(result.getMessage().contains(ErrorCode.USER_NOT_FOUND.getMessage())); // 包含枚举消息
+        assertTrue(result.getMessage().contains("用户ID: 999")); // 包含详细信息
+    } // testHandleBusinessExceptionWithDetail方法结束
+} // GlobalExceptionHandlerTest类结束

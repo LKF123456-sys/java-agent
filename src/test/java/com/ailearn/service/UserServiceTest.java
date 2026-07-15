@@ -1,31 +1,31 @@
-package com.ailearn.service;
+package com.ailearn.service; // 声明包名，service包存放业务逻辑服务类
 
-import com.ailearn.common.BusinessException;
-import com.ailearn.common.ErrorCode;
-import com.ailearn.dto.LoginRequest;
-import com.ailearn.dto.RegisterRequest;
-import com.ailearn.entity.User;
-import com.ailearn.mapper.UserMapper;
-import com.ailearn.security.JwtUtil;
-import com.ailearn.security.UserPrincipal;
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import com.ailearn.common.BusinessException; // 业务异常类，用于封装业务逻辑错误
+import com.ailearn.common.ErrorCode; // 错误码枚举类，定义系统所有错误码和错误消息
+import com.ailearn.dto.LoginRequest; // 登录请求DTO
+import com.ailearn.dto.RegisterRequest; // 注册请求DTO
+import com.ailearn.entity.User; // 用户实体类，对应数据库user表
+import com.ailearn.mapper.UserMapper; // MyBatis-Plus Mapper接口，用户数据访问层
+import com.ailearn.security.JwtUtil; // JWT工具类
+import com.ailearn.security.UserPrincipal; // 用户主体类
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper; // MyBatis-Plus Lambda查询构造器
+import org.junit.jupiter.api.BeforeEach; // JUnit 5注解，每个测试前执行
+import org.junit.jupiter.api.DisplayName; // JUnit 5注解，测试显示名称
+import org.junit.jupiter.api.Test; // JUnit 5注解，测试方法
+import org.junit.jupiter.api.extension.ExtendWith; // JUnit 5注解，启用扩展
+import org.mockito.ArgumentCaptor; // Mockito参数捕获器，用于捕获方法调用时的参数
+import org.mockito.InjectMocks; // Mockito注解，自动注入mock对象到被测类
+import org.mockito.Mock; // Mockito注解，创建mock对象
+import org.mockito.junit.jupiter.MockitoExtension; // Mockito JUnit 5扩展，启用Mockito注解支持
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder; // BCrypt密码编码器实现
+import org.springframework.security.crypto.password.PasswordEncoder; // 密码编码器接口
 
-import java.util.Map;
+import java.util.Map; // Map接口
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.isA;
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.*; // JUnit断言静态导入
+import static org.mockito.ArgumentMatchers.any; // Mockito参数匹配器，匹配任意对象
+import static org.mockito.ArgumentMatchers.isA; // Mockito参数匹配器，匹配指定类型
+import static org.mockito.Mockito.*; // Mockito静态导入（when、verify、never等）
 
 /**
  * UserService单元测试类
@@ -34,464 +34,326 @@ import static org.mockito.Mockito.*;
  *
  * @author AiLearn Platform
  */
-@ExtendWith(MockitoExtension.class)
-@DisplayName("用户服务测试")
-class UserServiceTest {
+@ExtendWith(MockitoExtension.class) // 启用Mockito JUnit 5扩展，支持@Mock、@InjectMocks等注解
+@DisplayName("用户服务测试") // 测试类显示名称
+class UserServiceTest { // UserService单元测试类定义
 
-    /**
-     * Mock用户数据访问接口
-     */
-    @Mock
-    private UserMapper userMapper;
+    @Mock // 创建UserMapper的Mock对象
+    private UserMapper userMapper; // Mock用户数据访问接口
 
-    /**
-     * Mock密码编码器（使用真实BCrypt实例，因为其方法稳定可靠）
-     */
-    private PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+    private PasswordEncoder passwordEncoder = new BCryptPasswordEncoder(); // 使用真实BCrypt实例，行为确定无需mock
 
-    /**
-     * Mock JWT工具类
-     */
-    @Mock
-    private JwtUtil jwtUtil;
+    @Mock // 创建JwtUtil的Mock对象
+    private JwtUtil jwtUtil; // Mock JWT工具类
 
-    /**
-     * 被测试的UserService实例，@InjectMocks会自动注入mock的依赖
-     */
-    @InjectMocks
-    private UserService userService;
+    @InjectMocks // 创建UserService实例并自动注入@Mock标注的依赖
+    private UserService userService; // 被测UserService实例
 
-    /**
-     * 测试用户数据
-     */
-    private static final String TEST_USERNAME = "testuser";
-    private static final String TEST_PASSWORD = "password123";
-    private static final String TEST_NICKNAME = "测试用户";
-    private static final String TEST_ROLE = "user";
-    private static final Long TEST_USER_ID = 1L;
-    private static final String TEST_ACCESS_TOKEN = "test-access-token";
-    private static final String TEST_REFRESH_TOKEN = "test-refresh-token";
+    private static final String TEST_USERNAME = "testuser"; // 测试用户名常量
+    private static final String TEST_PASSWORD = "password123"; // 测试密码常量
+    private static final String TEST_NICKNAME = "测试用户"; // 测试昵称常量
+    private static final String TEST_ROLE = "user"; // 测试角色常量
+    private static final Long TEST_USER_ID = 1L; // 测试用户ID常量
+    private static final String TEST_ACCESS_TOKEN = "test-access-token"; // 测试Access Token常量
+    private static final String TEST_REFRESH_TOKEN = "test-refresh-token"; // 测试Refresh Token常量
 
-    /**
-     * 每个测试方法执行前的初始化
-     * 注意：由于@InjectMocks不会注入我们手动创建的PasswordEncoder，需要使用反射设置
-     */
-    @BeforeEach
-    void setUp() {
-        // 使用反射注入真实的PasswordEncoder（因为BCrypt的行为是确定的，无需mock）
-        org.springframework.test.util.ReflectionTestUtils.setField(userService, "passwordEncoder", passwordEncoder);
-    }
+    @BeforeEach // 每个测试方法执行前初始化
+    void setUp() { // 初始化方法
+        org.springframework.test.util.ReflectionTestUtils.setField(userService, "passwordEncoder", passwordEncoder); // 反射注入真实的PasswordEncoder
+    } // setUp方法结束
 
-    /**
-     * 测试用户注册成功场景
-     * 验证：用户名不存在时注册成功、密码被加密、保存用户、返回Token
-     */
-    @Test
-    @DisplayName("用户注册 - 成功场景")
-    void testRegister_Success() {
-        // 准备：构造注册请求
-        RegisterRequest req = new RegisterRequest();
-        req.setUsername(TEST_USERNAME);
-        req.setPassword(TEST_PASSWORD);
-        req.setNickname(TEST_NICKNAME);
-        req.setRole(TEST_ROLE);
+    @Test // 测试方法
+    @DisplayName("用户注册 - 成功场景") // 测试显示名称
+    void testRegister_Success() { // 测试用户注册成功场景
+        RegisterRequest req = new RegisterRequest(); // 构造注册请求
+        req.setUsername(TEST_USERNAME); // 设置用户名
+        req.setPassword(TEST_PASSWORD); // 设置密码
+        req.setNickname(TEST_NICKNAME); // 设置昵称
+        req.setRole(TEST_ROLE); // 设置角色
 
-        // Mock：用户不存在（findByUsername返回null）
-        when(userMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
-        // Mock：insert操作后设置用户ID（模拟MyBatis-Plus自动回填ID）
-        doAnswer(invocation -> {
-            User user = invocation.getArgument(0);
-            user.setId(TEST_USER_ID);
-            return 1;
-        }).when(userMapper).insert(any(User.class));
-        // Mock：JWT Token生成
-        when(jwtUtil.generateAccessToken(TEST_USER_ID, TEST_USERNAME, TEST_ROLE)).thenReturn(TEST_ACCESS_TOKEN);
-        when(jwtUtil.generateRefreshToken(TEST_USER_ID, TEST_USERNAME, TEST_ROLE)).thenReturn(TEST_REFRESH_TOKEN);
+        when(userMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null); // Mock查询用户返回null（用户名不存在）
+        doAnswer(invocation -> { // Mock insert操作，模拟MyBatis-Plus回填ID
+            User user = invocation.getArgument(0); // 获取传入的User参数
+            user.setId(TEST_USER_ID); // 设置用户ID（模拟数据库自增回填）
+            return 1; // 返回影响行数1
+        }).when(userMapper).insert(any(User.class)); // 当调用userMapper.insert时执行上面的逻辑
+        when(jwtUtil.generateAccessToken(TEST_USER_ID, TEST_USERNAME, TEST_ROLE)).thenReturn(TEST_ACCESS_TOKEN); // Mock生成Access Token
+        when(jwtUtil.generateRefreshToken(TEST_USER_ID, TEST_USERNAME, TEST_ROLE)).thenReturn(TEST_REFRESH_TOKEN); // Mock生成Refresh Token
 
-        // 执行：注册
-        Map<String, Object> result = userService.register(req);
+        Map<String, Object> result = userService.register(req); // 执行注册
 
-        // 验证：返回结果包含必要字段
-        assertNotNull(result, "注册结果不应为空");
-        assertTrue(result.containsKey("user"), "返回结果应包含user");
-        assertTrue(result.containsKey("accessToken"), "返回结果应包含accessToken");
-        assertTrue(result.containsKey("refreshToken"), "返回结果应包含refreshToken");
+        assertNotNull(result, "注册结果不应为空"); // 断言结果不为空
+        assertTrue(result.containsKey("user"), "返回结果应包含user"); // 包含user字段
+        assertTrue(result.containsKey("accessToken"), "返回结果应包含accessToken"); // 包含accessToken字段
+        assertTrue(result.containsKey("refreshToken"), "返回结果应包含refreshToken"); // 包含refreshToken字段
 
-        // 验证：用户信息正确
-        UserPrincipal userPrincipal = (UserPrincipal) result.get("user");
-        assertEquals(TEST_USER_ID, userPrincipal.getUserId(), "用户ID应正确");
-        assertEquals(TEST_USERNAME, userPrincipal.getUsername(), "用户名应正确");
-        assertEquals(TEST_ROLE, userPrincipal.getRole(), "用户角色应正确");
+        UserPrincipal userPrincipal = (UserPrincipal) result.get("user"); // 获取用户主体
+        assertEquals(TEST_USER_ID, userPrincipal.getUserId(), "用户ID应正确"); // 用户ID正确
+        assertEquals(TEST_USERNAME, userPrincipal.getUsername(), "用户名应正确"); // 用户名正确
+        assertEquals(TEST_ROLE, userPrincipal.getRole(), "用户角色应正确"); // 角色正确
 
-        // 验证：Token正确
-        assertEquals(TEST_ACCESS_TOKEN, result.get("accessToken"), "Access Token应正确");
-        assertEquals(TEST_REFRESH_TOKEN, result.get("refreshToken"), "Refresh Token应正确");
+        assertEquals(TEST_ACCESS_TOKEN, result.get("accessToken"), "Access Token应正确"); // Access Token正确
+        assertEquals(TEST_REFRESH_TOKEN, result.get("refreshToken"), "Refresh Token应正确"); // Refresh Token正确
 
-        // 验证：密码被加密（捕获insert的User参数验证密码不是明文）
-        ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
-        verify(userMapper).insert(userCaptor.capture());
-        User savedUser = userCaptor.getValue();
-        assertNotEquals(TEST_PASSWORD, savedUser.getPassword(), "保存的密码不应是明文");
-        assertTrue(passwordEncoder.matches(TEST_PASSWORD, savedUser.getPassword()), "加密后的密码应能匹配原密码");
+        ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class); // 创建User参数捕获器
+        verify(userMapper).insert(userCaptor.capture()); // 验证insert被调用并捕获参数
+        User savedUser = userCaptor.getValue(); // 获取捕获的User对象
+        assertNotEquals(TEST_PASSWORD, savedUser.getPassword(), "保存的密码不应是明文"); // 密码不是明文
+        assertTrue(passwordEncoder.matches(TEST_PASSWORD, savedUser.getPassword()), "加密后的密码应能匹配原密码"); // BCrypt加密后能匹配原密码
 
-        // 验证：JWT生成方法被调用
-        verify(jwtUtil).generateAccessToken(TEST_USER_ID, TEST_USERNAME, TEST_ROLE);
-        verify(jwtUtil).generateRefreshToken(TEST_USER_ID, TEST_USERNAME, TEST_ROLE);
-    }
+        verify(jwtUtil).generateAccessToken(TEST_USER_ID, TEST_USERNAME, TEST_ROLE); // 验证generateAccessToken被调用
+        verify(jwtUtil).generateRefreshToken(TEST_USER_ID, TEST_USERNAME, TEST_ROLE); // 验证generateRefreshToken被调用
+    } // testRegister_Success方法结束
 
-    /**
-     * 测试注册时用户名已存在场景
-     * 验证：抛出USER_USERNAME_EXISTS异常
-     */
     @Test
     @DisplayName("用户注册 - 用户名已存在应抛出异常")
-    void testRegister_UsernameExists() {
-        // 准备：构造注册请求
-        RegisterRequest req = new RegisterRequest();
-        req.setUsername(TEST_USERNAME);
-        req.setPassword(TEST_PASSWORD);
+    void testRegister_UsernameExists() { // 测试用户名已存在场景
+        RegisterRequest req = new RegisterRequest(); // 构造注册请求
+        req.setUsername(TEST_USERNAME); // 设置用户名
+        req.setPassword(TEST_PASSWORD); // 设置密码
 
-        // Mock：用户名已存在
-        User existingUser = new User();
-        existingUser.setUsername(TEST_USERNAME);
-        when(userMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(existingUser);
+        User existingUser = new User(); // 构造已存在用户
+        existingUser.setUsername(TEST_USERNAME); // 设置用户名
+        when(userMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(existingUser); // Mock查询返回已存在用户
 
-        // 执行&验证：应抛出BusinessException
-        BusinessException exception = assertThrows(BusinessException.class,
-                () -> userService.register(req),
-                "用户名已存在时应抛出BusinessException");
+        BusinessException exception = assertThrows(BusinessException.class, // 断言抛出BusinessException
+                () -> userService.register(req), // 执行注册
+                "用户名已存在时应抛出BusinessException"); // 断言失败消息
 
-        // 验证：错误码正确
-        assertEquals(ErrorCode.USER_USERNAME_EXISTS.getCode(), exception.getCode(),
-                "错误码应为USER_USERNAME_EXISTS");
+        assertEquals(ErrorCode.USER_USERNAME_EXISTS.getCode(), exception.getCode(), "错误码应为USER_USERNAME_EXISTS"); // 错误码正确
 
-        // 验证：insert未被调用
-        verify(userMapper, never()).insert(any(User.class));
-    }
+        verify(userMapper, never()).insert(any(User.class)); // 验证insert从未被调用
+    } // testRegister_UsernameExists方法结束
 
-    /**
-     * 测试注册时昵称为空的场景
-     * 验证：昵称默认使用用户名
-     */
     @Test
     @DisplayName("用户注册 - 昵称为空时默认使用用户名")
-    void testRegister_NullNickname() {
-        // 准备：注册请求不设置昵称
-        RegisterRequest req = new RegisterRequest();
-        req.setUsername(TEST_USERNAME);
-        req.setPassword(TEST_PASSWORD);
-        req.setNickname(null);
+    void testRegister_NullNickname() { // 测试昵称为空场景
+        RegisterRequest req = new RegisterRequest(); // 构造注册请求
+        req.setUsername(TEST_USERNAME); // 设置用户名
+        req.setPassword(TEST_PASSWORD); // 设置密码
+        req.setNickname(null); // 昵称为null
 
-        // Mock依赖
-        when(userMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
-        doAnswer(invocation -> {
+        when(userMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null); // Mock用户不存在
+        doAnswer(invocation -> { // Mock insert回填ID
             User user = invocation.getArgument(0);
             user.setId(TEST_USER_ID);
             return 1;
         }).when(userMapper).insert(any(User.class));
-        when(jwtUtil.generateAccessToken(anyLong(), anyString(), anyString())).thenReturn(TEST_ACCESS_TOKEN);
+        when(jwtUtil.generateAccessToken(anyLong(), anyString(), anyString())).thenReturn(TEST_ACCESS_TOKEN); // Mock任意参数生成Token
         when(jwtUtil.generateRefreshToken(anyLong(), anyString(), anyString())).thenReturn(TEST_REFRESH_TOKEN);
 
-        // 执行
-        userService.register(req);
+        userService.register(req); // 执行注册
 
-        // 验证：保存的用户昵称应等于用户名
-        ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
-        verify(userMapper).insert(userCaptor.capture());
-        assertEquals(TEST_USERNAME, userCaptor.getValue().getNickname(),
-                "昵称为空时应默认使用用户名");
-    }
+        ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class); // 捕获保存的用户
+        verify(userMapper).insert(userCaptor.capture()); // 验证insert调用
+        assertEquals(TEST_USERNAME, userCaptor.getValue().getNickname(), "昵称为空时应默认使用用户名"); // 昵称默认使用用户名
+    } // testRegister_NullNickname方法结束
 
-    /**
-     * 测试用户登录成功场景
-     * 验证：正确密码登录成功、返回Token
-     */
     @Test
     @DisplayName("用户登录 - 成功场景")
-    void testLogin_Success() {
-        // 准备：构造登录请求
-        LoginRequest req = new LoginRequest();
-        req.setUsername(TEST_USERNAME);
-        req.setPassword(TEST_PASSWORD);
+    void testLogin_Success() { // 测试登录成功场景
+        LoginRequest req = new LoginRequest(); // 构造登录请求
+        req.setUsername(TEST_USERNAME); // 设置用户名
+        req.setPassword(TEST_PASSWORD); // 设置密码
 
-        // Mock：查询到用户，密码已加密
-        User user = new User();
-        user.setId(TEST_USER_ID);
-        user.setUsername(TEST_USERNAME);
-        user.setPassword(passwordEncoder.encode(TEST_PASSWORD));
-        user.setRole(TEST_ROLE);
-        when(userMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(user);
+        User user = new User(); // 构造用户
+        user.setId(TEST_USER_ID); // 设置用户ID
+        user.setUsername(TEST_USERNAME); // 设置用户名
+        user.setPassword(passwordEncoder.encode(TEST_PASSWORD)); // 设置BCrypt加密后的密码
+        user.setRole(TEST_ROLE); // 设置角色
+        when(userMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(user); // Mock查询到用户
 
-        // Mock：Token生成
-        when(jwtUtil.generateAccessToken(TEST_USER_ID, TEST_USERNAME, TEST_ROLE)).thenReturn(TEST_ACCESS_TOKEN);
+        when(jwtUtil.generateAccessToken(TEST_USER_ID, TEST_USERNAME, TEST_ROLE)).thenReturn(TEST_ACCESS_TOKEN); // Mock Token生成
         when(jwtUtil.generateRefreshToken(TEST_USER_ID, TEST_USERNAME, TEST_ROLE)).thenReturn(TEST_REFRESH_TOKEN);
 
-        // 执行：登录
-        Map<String, Object> result = userService.login(req);
+        Map<String, Object> result = userService.login(req); // 执行登录
 
-        // 验证：返回结果正确
-        assertNotNull(result);
-        UserPrincipal userPrincipal = (UserPrincipal) result.get("user");
-        assertEquals(TEST_USER_ID, userPrincipal.getUserId());
-        assertEquals(TEST_USERNAME, userPrincipal.getUsername());
-        assertEquals(TEST_ACCESS_TOKEN, result.get("accessToken"));
+        assertNotNull(result); // 结果不为空
+        UserPrincipal userPrincipal = (UserPrincipal) result.get("user"); // 获取用户主体
+        assertEquals(TEST_USER_ID, userPrincipal.getUserId()); // 用户ID正确
+        assertEquals(TEST_USERNAME, userPrincipal.getUsername()); // 用户名正确
+        assertEquals(TEST_ACCESS_TOKEN, result.get("accessToken")); // Token正确
         assertEquals(TEST_REFRESH_TOKEN, result.get("refreshToken"));
 
-        // 验证：Token生成被调用
-        verify(jwtUtil).generateAccessToken(TEST_USER_ID, TEST_USERNAME, TEST_ROLE);
-    }
+        verify(jwtUtil).generateAccessToken(TEST_USER_ID, TEST_USERNAME, TEST_ROLE); // 验证Token生成调用
+    } // testLogin_Success方法结束
 
-    /**
-     * 测试登录时用户不存在场景
-     * 验证：抛出AUTH_LOGIN_FAILED异常（不透露是用户名还是密码错误）
-     */
     @Test
     @DisplayName("用户登录 - 用户不存在应抛出异常")
-    void testLogin_UserNotFound() {
-        // 准备
-        LoginRequest req = new LoginRequest();
-        req.setUsername(TEST_USERNAME);
-        req.setPassword(TEST_PASSWORD);
+    void testLogin_UserNotFound() { // 测试用户不存在场景
+        LoginRequest req = new LoginRequest(); // 构造登录请求
+        req.setUsername(TEST_USERNAME); // 设置用户名
+        req.setPassword(TEST_PASSWORD); // 设置密码
 
-        // Mock：用户不存在
-        when(userMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
+        when(userMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null); // Mock查询不到用户
 
-        // 执行&验证
-        BusinessException exception = assertThrows(BusinessException.class,
+        BusinessException exception = assertThrows(BusinessException.class, // 断言抛出异常
                 () -> userService.login(req),
                 "用户不存在时应抛出异常");
-        assertEquals(ErrorCode.AUTH_LOGIN_FAILED.getCode(), exception.getCode(),
-                "错误码应为AUTH_LOGIN_FAILED");
-    }
+        assertEquals(ErrorCode.AUTH_LOGIN_FAILED.getCode(), exception.getCode(), "错误码应为AUTH_LOGIN_FAILED"); // 错误码是登录失败（不透露具体原因）
+    } // testLogin_UserNotFound方法结束
 
-    /**
-     * 测试登录时密码错误场景
-     * 验证：抛出AUTH_LOGIN_FAILED异常
-     */
     @Test
     @DisplayName("用户登录 - 密码错误应抛出异常")
-    void testLogin_WrongPassword() {
-        // 准备
-        LoginRequest req = new LoginRequest();
-        req.setUsername(TEST_USERNAME);
-        req.setPassword("wrongpassword");
+    void testLogin_WrongPassword() { // 测试密码错误场景
+        LoginRequest req = new LoginRequest(); // 构造登录请求
+        req.setUsername(TEST_USERNAME); // 设置用户名
+        req.setPassword("wrongpassword"); // 错误密码
 
-        // Mock：用户存在但密码不匹配
-        User user = new User();
+        User user = new User(); // 构造用户
         user.setId(TEST_USER_ID);
         user.setUsername(TEST_USERNAME);
-        user.setPassword(passwordEncoder.encode(TEST_PASSWORD));
+        user.setPassword(passwordEncoder.encode(TEST_PASSWORD)); // 正确密码的加密值
         user.setRole(TEST_ROLE);
-        when(userMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(user);
+        when(userMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(user); // Mock查询到用户
 
-        // 执行&验证
-        BusinessException exception = assertThrows(BusinessException.class,
+        BusinessException exception = assertThrows(BusinessException.class, // 断言抛出异常
                 () -> userService.login(req),
                 "密码错误时应抛出异常");
-        assertEquals(ErrorCode.AUTH_LOGIN_FAILED.getCode(), exception.getCode());
-    }
+        assertEquals(ErrorCode.AUTH_LOGIN_FAILED.getCode(), exception.getCode()); // 错误码是登录失败
+    } // testLogin_WrongPassword方法结束
 
-    /**
-     * 测试刷新Token成功场景
-     * 验证：有效的Refresh Token能刷新出新的Access Token
-     */
     @Test
     @DisplayName("刷新Token - 成功场景")
-    void testRefreshToken_Success() {
-        // 准备：有效的Refresh Token
-        String refreshToken = TEST_REFRESH_TOKEN;
+    void testRefreshToken_Success() { // 测试刷新Token成功场景
+        String refreshToken = TEST_REFRESH_TOKEN; // 测试Refresh Token
 
-        // Mock：Refresh Token验证通过，类型正确
-        when(jwtUtil.validateRefreshToken(refreshToken)).thenReturn(true);
-        when(jwtUtil.extractTokenType(refreshToken)).thenReturn(JwtUtil.TOKEN_TYPE_REFRESH);
-        when(jwtUtil.extractUserId(refreshToken)).thenReturn(TEST_USER_ID);
-        when(jwtUtil.extractUsername(refreshToken)).thenReturn(TEST_USERNAME);
-        when(jwtUtil.extractRole(refreshToken)).thenReturn(TEST_ROLE);
-        when(jwtUtil.generateAccessToken(TEST_USER_ID, TEST_USERNAME, TEST_ROLE)).thenReturn("new-access-token");
+        when(jwtUtil.validateRefreshToken(refreshToken)).thenReturn(true); // Mock Refresh Token有效
+        when(jwtUtil.extractTokenType(refreshToken)).thenReturn(JwtUtil.TOKEN_TYPE_REFRESH); // Mock Token类型是refresh
+        when(jwtUtil.extractUserId(refreshToken)).thenReturn(TEST_USER_ID); // Mock提取用户ID
+        when(jwtUtil.extractUsername(refreshToken)).thenReturn(TEST_USERNAME); // Mock提取用户名
+        when(jwtUtil.extractRole(refreshToken)).thenReturn(TEST_ROLE); // Mock提取角色
+        when(jwtUtil.generateAccessToken(TEST_USER_ID, TEST_USERNAME, TEST_ROLE)).thenReturn("new-access-token"); // Mock生成新Access Token
 
-        // 执行
-        String newAccessToken = userService.refreshToken(refreshToken);
+        String newAccessToken = userService.refreshToken(refreshToken); // 执行刷新
 
-        // 验证
-        assertEquals("new-access-token", newAccessToken, "应返回新的Access Token");
-        verify(jwtUtil).generateAccessToken(TEST_USER_ID, TEST_USERNAME, TEST_ROLE);
-    }
+        assertEquals("new-access-token", newAccessToken, "应返回新的Access Token"); // 返回新Token
+        verify(jwtUtil).generateAccessToken(TEST_USER_ID, TEST_USERNAME, TEST_ROLE); // 验证Token生成调用
+    } // testRefreshToken_Success方法结束
 
-    /**
-     * 测试刷新Token时Token无效场景
-     * 验证：无效Token抛出AUTH_TOKEN_INVALID异常
-     */
     @Test
     @DisplayName("刷新Token - 无效Token应抛出异常")
-    void testRefreshToken_InvalidToken() {
-        String invalidToken = "invalid-token";
+    void testRefreshToken_InvalidToken() { // 测试无效Token场景
+        String invalidToken = "invalid-token"; // 无效Token
 
-        // Mock：Token验证失败
-        when(jwtUtil.validateRefreshToken(invalidToken)).thenReturn(false);
+        when(jwtUtil.validateRefreshToken(invalidToken)).thenReturn(false); // Mock验证失败
 
-        // 执行&验证
-        BusinessException exception = assertThrows(BusinessException.class,
+        BusinessException exception = assertThrows(BusinessException.class, // 断言抛出异常
                 () -> userService.refreshToken(invalidToken));
-        assertEquals(ErrorCode.AUTH_TOKEN_INVALID.getCode(), exception.getCode());
-    }
+        assertEquals(ErrorCode.AUTH_TOKEN_INVALID.getCode(), exception.getCode()); // 错误码Token无效
+    } // testRefreshToken_InvalidToken方法结束
 
-    /**
-     * 测试刷新Token时Token类型错误（使用Access Token刷新）
-     * 验证：抛出AUTH_TOKEN_INVALID异常
-     */
     @Test
     @DisplayName("刷新Token - Token类型错误（Access Token）应抛出异常")
-    void testRefreshToken_WrongTokenType() {
-        String accessToken = "access-token";
+    void testRefreshToken_WrongTokenType() { // 测试Token类型错误场景
+        String accessToken = "access-token"; // Access Token
 
-        // Mock：Token有效但类型是access而不是refresh
-        when(jwtUtil.validateRefreshToken(accessToken)).thenReturn(true);
-        when(jwtUtil.extractTokenType(accessToken)).thenReturn(JwtUtil.TOKEN_TYPE_ACCESS);
+        when(jwtUtil.validateRefreshToken(accessToken)).thenReturn(true); // Mock验证通过（但类型错误）
+        when(jwtUtil.extractTokenType(accessToken)).thenReturn(JwtUtil.TOKEN_TYPE_ACCESS); // Mock返回access类型
 
-        // 执行&验证
-        BusinessException exception = assertThrows(BusinessException.class,
+        BusinessException exception = assertThrows(BusinessException.class, // 断言抛出异常
                 () -> userService.refreshToken(accessToken));
-        assertEquals(ErrorCode.AUTH_TOKEN_INVALID.getCode(), exception.getCode());
-    }
+        assertEquals(ErrorCode.AUTH_TOKEN_INVALID.getCode(), exception.getCode()); // 错误码Token无效
+    } // testRefreshToken_WrongTokenType方法结束
 
-    /**
-     * 测试根据ID查询用户成功场景
-     */
     @Test
     @DisplayName("根据ID查询用户 - 成功场景")
-    void testGetUserById_Success() {
-        // Mock：查询到用户
-        User user = new User();
+    void testGetUserById_Success() { // 测试按ID查询用户成功
+        User user = new User(); // 构造用户
         user.setId(TEST_USER_ID);
         user.setUsername(TEST_USERNAME);
-        when(userMapper.selectById(TEST_USER_ID)).thenReturn(user);
+        when(userMapper.selectById(TEST_USER_ID)).thenReturn(user); // Mock查询到用户
 
-        // 执行
-        User result = userService.getUserById(TEST_USER_ID);
+        User result = userService.getUserById(TEST_USER_ID); // 执行查询
 
-        // 验证
-        assertNotNull(result);
-        assertEquals(TEST_USER_ID, result.getId());
-        assertEquals(TEST_USERNAME, result.getUsername());
-    }
+        assertNotNull(result); // 结果不为空
+        assertEquals(TEST_USER_ID, result.getId()); // ID正确
+        assertEquals(TEST_USERNAME, result.getUsername()); // 用户名正确
+    } // testGetUserById_Success方法结束
 
-    /**
-     * 测试根据ID查询用户不存在场景
-     * 验证：抛出USER_NOT_FOUND异常
-     */
     @Test
     @DisplayName("根据ID查询用户 - 用户不存在应抛出异常")
-    void testGetUserById_NotFound() {
-        // Mock：用户不存在
-        when(userMapper.selectById(TEST_USER_ID)).thenReturn(null);
+    void testGetUserById_NotFound() { // 测试用户不存在场景
+        when(userMapper.selectById(TEST_USER_ID)).thenReturn(null); // Mock查询不到用户
 
-        // 执行&验证
-        BusinessException exception = assertThrows(BusinessException.class,
+        BusinessException exception = assertThrows(BusinessException.class, // 断言抛出异常
                 () -> userService.getUserById(TEST_USER_ID));
-        assertEquals(ErrorCode.USER_NOT_FOUND.getCode(), exception.getCode());
-    }
+        assertEquals(ErrorCode.USER_NOT_FOUND.getCode(), exception.getCode()); // 错误码用户不存在
+    } // testGetUserById_NotFound方法结束
 
-    /**
-     * 测试更新昵称成功场景
-     */
     @Test
     @DisplayName("更新用户昵称 - 成功场景")
-    void testUpdateNickname_Success() {
-        String newNickname = "新昵称";
+    void testUpdateNickname_Success() { // 测试更新昵称成功
+        String newNickname = "新昵称"; // 新昵称
 
-        // Mock：查询到用户
-        User user = new User();
+        User user = new User(); // 构造用户
         user.setId(TEST_USER_ID);
         user.setUsername(TEST_USERNAME);
         user.setNickname(TEST_NICKNAME);
-        when(userMapper.selectById(TEST_USER_ID)).thenReturn(user);
+        when(userMapper.selectById(TEST_USER_ID)).thenReturn(user); // Mock查询到用户
 
-        // 执行
-        User result = userService.updateNickname(TEST_USER_ID, newNickname);
+        User result = userService.updateNickname(TEST_USER_ID, newNickname); // 执行更新
 
-        // 验证：昵称被更新
-        assertEquals(newNickname, result.getNickname());
-        verify(userMapper).updateById(user);
-    }
+        assertEquals(newNickname, result.getNickname()); // 昵称已更新
+        verify(userMapper).updateById(user); // 验证updateById被调用
+    } // testUpdateNickname_Success方法结束
 
-    /**
-     * 测试更新昵称时用户不存在场景
-     */
     @Test
     @DisplayName("更新用户昵称 - 用户不存在应抛出异常")
-    void testUpdateNickname_UserNotFound() {
-        when(userMapper.selectById(TEST_USER_ID)).thenReturn(null);
+    void testUpdateNickname_UserNotFound() { // 测试用户不存在场景
+        when(userMapper.selectById(TEST_USER_ID)).thenReturn(null); // Mock查询不到用户
 
-        BusinessException exception = assertThrows(BusinessException.class,
+        BusinessException exception = assertThrows(BusinessException.class, // 断言抛出异常
                 () -> userService.updateNickname(TEST_USER_ID, "新昵称"));
-        assertEquals(ErrorCode.USER_NOT_FOUND.getCode(), exception.getCode());
-        verify(userMapper, never()).updateById(isA(User.class));
-    }
+        assertEquals(ErrorCode.USER_NOT_FOUND.getCode(), exception.getCode()); // 错误码用户不存在
+        verify(userMapper, never()).updateById(isA(User.class)); // 验证updateById未被调用
+    } // testUpdateNickname_UserNotFound方法结束
 
-    /**
-     * 测试创建第一个用户为管理员场景
-     * 验证：系统中第一个注册的用户角色为admin
-     */
     @Test
     @DisplayName("创建用户 - 第一个用户应为管理员")
-    void testCreateUser_FirstUserIsAdmin() {
-        // Mock：当前用户数为0（第一个用户）
-        when(userMapper.selectCount(null)).thenReturn(0L);
-        doAnswer(invocation -> {
+    void testCreateUser_FirstUserIsAdmin() { // 测试第一个用户是管理员
+        when(userMapper.selectCount(null)).thenReturn(0L); // Mock用户数为0（第一个用户）
+        doAnswer(invocation -> { // Mock insert回填ID
             User user = invocation.getArgument(0);
             user.setId(1L);
             return 1;
         }).when(userMapper).insert(any(User.class));
 
-        // 执行
-        User result = userService.createUser(TEST_USERNAME, TEST_NICKNAME, TEST_PASSWORD);
+        User result = userService.createUser(TEST_USERNAME, TEST_NICKNAME, TEST_PASSWORD); // 执行创建用户
 
-        // 验证：角色为admin
-        ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
+        ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class); // 捕获保存的用户
         verify(userMapper).insert(userCaptor.capture());
-        assertEquals("admin", userCaptor.getValue().getRole(), "第一个用户应为管理员");
-    }
+        assertEquals("admin", userCaptor.getValue().getRole(), "第一个用户应为管理员"); // 角色是admin
+    } // testCreateUser_FirstUserIsAdmin方法结束
 
-    /**
-     * 测试创建非第一个用户为普通用户场景
-     */
     @Test
     @DisplayName("创建用户 - 非第一个用户应为普通用户")
-    void testCreateUser_NotFirstUserIsNormal() {
-        // Mock：已有用户
-        when(userMapper.selectCount(null)).thenReturn(5L);
-        doAnswer(invocation -> {
+    void testCreateUser_NotFirstUserIsNormal() { // 测试非第一个用户是普通用户
+        when(userMapper.selectCount(null)).thenReturn(5L); // Mock已有5个用户
+        doAnswer(invocation -> { // Mock insert回填ID
             User user = invocation.getArgument(0);
             user.setId(6L);
             return 1;
         }).when(userMapper).insert(any(User.class));
 
-        // 执行
-        userService.createUser(TEST_USERNAME, TEST_NICKNAME, TEST_PASSWORD);
+        userService.createUser(TEST_USERNAME, TEST_NICKNAME, TEST_PASSWORD); // 执行创建
 
-        // 验证：角色为user
-        ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
+        ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class); // 捕获保存的用户
         verify(userMapper).insert(userCaptor.capture());
-        assertEquals("user", userCaptor.getValue().getRole(), "非第一个用户应为普通用户");
-    }
+        assertEquals("user", userCaptor.getValue().getRole(), "非第一个用户应为普通用户"); // 角色是user
+    } // testCreateUser_NotFirstUserIsNormal方法结束
 
-    /**
-     * 测试findByUsername方法
-     */
     @Test
     @DisplayName("根据用户名查询用户")
-    void testFindByUsername() {
-        // Mock
-        User user = new User();
+    void testFindByUsername() { // 测试按用户名查询用户
+        User user = new User(); // 构造用户
         user.setId(TEST_USER_ID);
         user.setUsername(TEST_USERNAME);
-        when(userMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(user);
+        when(userMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(user); // Mock查询到用户
 
-        // 执行
-        User result = userService.findByUsername(TEST_USERNAME);
+        User result = userService.findByUsername(TEST_USERNAME); // 执行查询
 
-        // 验证
-        assertNotNull(result);
-        assertEquals(TEST_USERNAME, result.getUsername());
-    }
-}
+        assertNotNull(result); // 结果不为空
+        assertEquals(TEST_USERNAME, result.getUsername()); // 用户名正确
+    } // testFindByUsername方法结束
+} // UserServiceTest类结束

@@ -1,455 +1,288 @@
-package com.ailearn.chat;
+package com.ailearn.chat; // 声明包名
 
-import com.ailearn.common.BusinessException;
-import com.ailearn.common.ErrorCode;
-import com.ailearn.dto.ChatRequest;
-import com.ailearn.entity.Conversation;
-import com.ailearn.security.UserPrincipal;
-import com.ailearn.service.ConversationService;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.MockedStatic;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.model.ChatModel;
-import reactor.core.publisher.Flux;
-import reactor.test.StepVerifier;
+import com.ailearn.common.BusinessException; // 业务异常类
+import com.ailearn.common.ErrorCode; // 错误码枚举
+import com.ailearn.dto.ChatRequest; // 聊天请求DTO
+import com.ailearn.entity.Conversation; // 会话实体
+import com.ailearn.security.UserPrincipal; // 用户主体类
+import com.ailearn.service.ConversationService; // 会话服务
+import org.junit.jupiter.api.AfterEach; // JUnit后置方法注解
+import org.junit.jupiter.api.BeforeEach; // JUnit前置方法注解
+import org.junit.jupiter.api.DisplayName; // JUnit显示名称注解
+import org.junit.jupiter.api.Test; // JUnit测试方法注解
+import org.junit.jupiter.api.extension.ExtendWith; // JUnit扩展注解
+import org.mockito.Mock; // Mockito创建Mock注解
+import org.mockito.MockedStatic; // Mockito静态Mock对象
+import org.mockito.junit.jupiter.MockitoExtension; // Mockito JUnit 5扩展
+import org.springframework.ai.chat.client.ChatClient; // Spring AI聊天客户端
+import org.springframework.ai.chat.model.ChatModel; // Spring AI聊天模型接口
+import reactor.core.publisher.Flux; // Reactor响应式流类
+import reactor.test.StepVerifier; // Reactor测试验证器
 
-import java.util.Map;
+import java.util.Map; // Map接口
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.*; // JUnit断言静态导入
+import static org.mockito.ArgumentMatchers.any; // Mockito参数匹配器
+import static org.mockito.ArgumentMatchers.anyLong; // Mockito long参数匹配器
+import static org.mockito.ArgumentMatchers.anyString; // Mockito String参数匹配器
+import static org.mockito.ArgumentMatchers.eq; // Mockito相等参数匹配器
+import static org.mockito.Mockito.*; // Mockito静态导入
 
-/**
- * ChatService单元测试类
- * 使用Mockito框架mock依赖（ChatModel、ChatClient、ConversationService）
- * 重点测试业务逻辑：会话管理、消息保存、异常处理等
- * AI模型调用部分通过mock ChatClient来隔离测试
- */
-@ExtendWith(MockitoExtension.class)
-@DisplayName("聊天服务单元测试")
-class ChatServiceTest {
+@ExtendWith(MockitoExtension.class) // 启用Mockito扩展
+@DisplayName("聊天服务单元测试") // 测试类显示名称
+class ChatServiceTest { // 聊天服务测试类
 
-    /**
-     * Mock ChatModel - Spring AI聊天模型
-     */
-    @Mock
-    private ChatModel chatModel;
+    @Mock // 创建ChatModel Mock对象
+    private ChatModel chatModel; // Mock聊天模型
 
-    /**
-     * Mock ChatClient.Builder - ChatClient构建器
-     */
-    @Mock
-    private ChatClient.Builder chatClientBuilder;
+    @Mock // 创建ChatClient.Builder Mock对象
+    private ChatClient.Builder chatClientBuilder; // Mock客户端构建器
 
-    /**
-     * Mock ChatClient - Spring AI聊天客户端
-     */
-    @Mock
-    private ChatClient chatClient;
+    @Mock // 创建ChatClient Mock对象
+    private ChatClient chatClient; // Mock聊天客户端
 
-    /**
-     * Mock ChatClient.ChatClientRequestSpec - 请求构建器
-     */
-    @Mock
-    private ChatClient.ChatClientRequestSpec requestSpec;
+    @Mock // 创建ChatClient.ChatClientRequestSpec Mock对象
+    private ChatClient.ChatClientRequestSpec requestSpec; // Mock请求规范
 
-    /**
-     * Mock ChatClient.CallResponseSpec - 同步响应规范
-     */
-    @Mock
-    private ChatClient.CallResponseSpec callResponseSpec;
+    @Mock // 创建ChatClient.CallResponseSpec Mock对象
+    private ChatClient.CallResponseSpec callResponseSpec; // Mock同步响应规范
 
-    /**
-     * Mock ChatClient.StreamResponseSpec - 流式响应规范
-     */
-    @Mock
-    private ChatClient.StreamResponseSpec streamResponseSpec;
+    @Mock // 创建ChatClient.StreamResponseSpec Mock对象
+    private ChatClient.StreamResponseSpec streamResponseSpec; // Mock流式响应规范
 
-    /**
-     * Mock ConversationService - 会话服务
-     */
-    @Mock
-    private ConversationService conversationService;
+    @Mock // 创建ConversationService Mock对象
+    private ConversationService conversationService; // Mock会话服务
 
-    /**
-     * 静态Mock对象，用于Mock ChatClient.builder()静态方法
-     */
-    private MockedStatic<ChatClient> chatClientStatic;
+    private MockedStatic<ChatClient> chatClientStatic; // 静态Mock对象，用于Mock ChatClient.builder()
 
-    /**
-     * 被测试的ChatService实例
-     */
-    private ChatService chatService;
+    private ChatService chatService; // 被测聊天服务实例
 
-    /**
-     * 测试用用户ID常量
-     */
-    private static final Long TEST_USER_ID = 1L;
+    private static final Long TEST_USER_ID = 1L; // 测试用户ID
+    private static final String TEST_USERNAME = "testuser"; // 测试用户名
+    private static final String TEST_ROLE = "user"; // 测试角色
+    private static final Long TEST_CONVERSATION_ID = 100L; // 测试会话ID
+    private static final String TEST_USER_MESSAGE = "你好，请介绍一下自己"; // 测试用户消息
+    private static final String TEST_AI_REPLY = "你好！我是赛博AI助手，很高兴为你服务。"; // 测试AI回复
 
-    /**
-     * 测试用用户名常量
-     */
-    private static final String TEST_USERNAME = "testuser";
+    private UserPrincipal testUser; // 测试用户主体对象
 
-    /**
-     * 测试用角色常量
-     */
-    private static final String TEST_ROLE = "user";
+    @BeforeEach // 每个测试前执行
+    void setUp() { // 初始化方法
+        testUser = UserPrincipal.create(TEST_USER_ID, TEST_USERNAME, TEST_ROLE); // 创建测试用户
 
-    /**
-     * 测试用会话ID常量
-     */
-    private static final Long TEST_CONVERSATION_ID = 100L;
+        chatClientStatic = mockStatic(ChatClient.class); // Mock静态方法ChatClient.builder()
+        chatClientStatic.when(() -> ChatClient.builder(chatModel)).thenReturn(chatClientBuilder); // Mock builder(chatModel)返回builder
 
-    /**
-     * 测试用用户消息常量
-     */
-    private static final String TEST_USER_MESSAGE = "你好，请介绍一下自己";
+        when(chatClientBuilder.defaultSystem(anyString())).thenReturn(chatClientBuilder); // Mock defaultSystem返回builder
+        when(chatClientBuilder.build()).thenReturn(chatClient); // Mock build返回chatClient
 
-    /**
-     * 测试用AI回复常量
-     */
-    private static final String TEST_AI_REPLY = "你好！我是赛博AI助手，很高兴为你服务。";
+        chatService = new ChatService(chatModel, conversationService); // 创建ChatService实例
+    } // setUp方法结束
 
-    /**
-     * 测试用用户主体对象
-     */
-    private UserPrincipal testUser;
+    @AfterEach // 每个测试后执行
+    void tearDown() { // 清理方法
+        if (chatClientStatic != null) { // 如果静态Mock存在
+            chatClientStatic.close(); // 关闭静态Mock
+        } // if结束
+    } // tearDown方法结束
 
-    /**
-     * 每个测试方法执行前的初始化
-     * Mock ChatClient构建流程，创建ChatService实例
-     */
-    @BeforeEach
-    void setUp() {
-        // 创建测试用户主体
-        testUser = UserPrincipal.create(TEST_USER_ID, TEST_USERNAME, TEST_ROLE);
+    private void setupMockForSyncChat(String aiReply) { // 设置同步聊天Mock调用链
+        when(chatClient.prompt()).thenReturn(requestSpec); // Mock prompt返回requestSpec
+        when(requestSpec.user(anyString())).thenReturn(requestSpec); // Mock user返回requestSpec
+        when(requestSpec.call()).thenReturn(callResponseSpec); // Mock call返回callResponseSpec
+        when(callResponseSpec.content()).thenReturn(aiReply); // Mock content返回AI回复
+    } // setupMockForSyncChat方法结束
 
-        // Mock ChatClient静态builder方法
-        chatClientStatic = mockStatic(ChatClient.class);
-        chatClientStatic.when(() -> ChatClient.builder(chatModel)).thenReturn(chatClientBuilder);
+    private void setupMockForStreamChat(String... tokens) { // 设置流式聊天Mock调用链
+        when(chatClient.prompt()).thenReturn(requestSpec); // Mock prompt返回requestSpec
+        when(requestSpec.user(anyString())).thenReturn(requestSpec); // Mock user返回requestSpec
+        when(requestSpec.stream()).thenReturn(streamResponseSpec); // Mock stream返回streamResponseSpec
+        when(streamResponseSpec.content()).thenReturn(Flux.just(tokens)); // Mock content返回token流
+    } // setupMockForStreamChat方法结束
 
-        // Mock ChatClient构建链
-        when(chatClientBuilder.defaultSystem(anyString())).thenReturn(chatClientBuilder);
-        when(chatClientBuilder.build()).thenReturn(chatClient);
-
-        // 创建ChatService实例
-        chatService = new ChatService(chatModel, conversationService);
-    }
-
-    /**
-     * 每个测试方法执行后的清理
-     * 关闭静态Mock对象
-     */
-    @AfterEach
-    void tearDown() {
-        if (chatClientStatic != null) {
-            chatClientStatic.close();
-        }
-    }
-
-    /**
-     * 设置同步聊天的Mock调用链
-     * @param aiReply AI回复内容
-     */
-    private void setupMockForSyncChat(String aiReply) {
-        when(chatClient.prompt()).thenReturn(requestSpec);
-        when(requestSpec.user(anyString())).thenReturn(requestSpec);
-        when(requestSpec.call()).thenReturn(callResponseSpec);
-        when(callResponseSpec.content()).thenReturn(aiReply);
-    }
-
-    /**
-     * 设置流式聊天的Mock调用链
-     * @param tokens 要返回的token数组
-     */
-    private void setupMockForStreamChat(String... tokens) {
-        when(chatClient.prompt()).thenReturn(requestSpec);
-        when(requestSpec.user(anyString())).thenReturn(requestSpec);
-        when(requestSpec.stream()).thenReturn(streamResponseSpec);
-        when(streamResponseSpec.content()).thenReturn(Flux.just(tokens));
-    }
-
-    /**
-     * 测试：同步对话成功场景（新会话）
-     * 当conversationId为null时，应该自动创建新会话
-     */
     @Test
     @DisplayName("同步对话 - 新会话成功场景")
-    void testChat_NewConversation_Success() {
-        // 准备请求对象 - 无conversationId
-        ChatRequest req = new ChatRequest();
-        req.setMessage(TEST_USER_MESSAGE);
-        req.setConversationId(null);
+    void testChat_NewConversation_Success() { // 测试新会话同步对话
+        ChatRequest req = new ChatRequest(); // 创建聊天请求
+        req.setMessage(TEST_USER_MESSAGE); // 设置用户消息
+        req.setConversationId(null); // 新会话无conversationId
 
-        // Mock：创建新会话返回预期会话
-        Conversation newConversation = new Conversation();
-        newConversation.setId(TEST_CONVERSATION_ID);
-        newConversation.setUserId(TEST_USER_ID);
-        when(conversationService.createConversation(eq(TEST_USER_ID), anyString(), eq("chat")))
-                .thenReturn(newConversation);
+        Conversation newConversation = new Conversation(); // 创建新会话
+        newConversation.setId(TEST_CONVERSATION_ID); // 设置会话ID
+        newConversation.setUserId(TEST_USER_ID); // 设置用户ID
+        when(conversationService.createConversation(eq(TEST_USER_ID), anyString(), eq("chat"))).thenReturn(newConversation); // Mock创建会话
 
-        // Mock：AI同步回复
-        setupMockForSyncChat(TEST_AI_REPLY);
+        setupMockForSyncChat(TEST_AI_REPLY); // 设置同步聊天Mock
 
-        // 执行测试
-        Map<String, Object> result = chatService.chat(req, testUser);
+        Map<String, Object> result = chatService.chat(req, testUser); // 执行聊天
 
-        // 验证返回结果
-        assertNotNull(result, "返回结果不应为空");
-        assertEquals(TEST_CONVERSATION_ID, result.get("conversationId"), "返回的会话ID应正确");
-        assertEquals(TEST_AI_REPLY, result.get("reply"), "返回的AI回复应正确");
+        assertNotNull(result, "返回结果不应为空"); // 结果不为空
+        assertEquals(TEST_CONVERSATION_ID, result.get("conversationId"), "返回的会话ID应正确"); // 会话ID正确
+        assertEquals(TEST_AI_REPLY, result.get("reply"), "返回的AI回复应正确"); // 回复正确
 
-        // 验证服务调用
-        verify(conversationService, times(1))
-                .createConversation(eq(TEST_USER_ID), anyString(), eq("chat"));
-        verify(conversationService, times(1))
-                .saveMessage(eq(TEST_USER_ID), eq(TEST_CONVERSATION_ID), eq("user"), eq(TEST_USER_MESSAGE));
-        verify(conversationService, times(1))
-                .saveMessage(eq(TEST_USER_ID), eq(TEST_CONVERSATION_ID), eq("assistant"), eq(TEST_AI_REPLY));
-    }
+        verify(conversationService, times(1)).createConversation(eq(TEST_USER_ID), anyString(), eq("chat")); // 验证创建会话调用
+        verify(conversationService, times(1)).saveMessage(eq(TEST_USER_ID), eq(TEST_CONVERSATION_ID), eq("user"), eq(TEST_USER_MESSAGE)); // 验证保存用户消息
+        verify(conversationService, times(1)).saveMessage(eq(TEST_USER_ID), eq(TEST_CONVERSATION_ID), eq("assistant"), eq(TEST_AI_REPLY)); // 验证保存助手消息
+    } // testChat_NewConversation_Success方法结束
 
-    /**
-     * 测试：同步对话成功场景（已有会话）
-     * 当conversationId存在时，应验证会话所有权并继续使用
-     */
     @Test
     @DisplayName("同步对话 - 已有会话成功场景")
-    void testChat_ExistingConversation_Success() {
-        // 准备请求对象 - 指定conversationId
-        ChatRequest req = new ChatRequest();
-        req.setMessage(TEST_USER_MESSAGE);
-        req.setConversationId(TEST_CONVERSATION_ID);
+    void testChat_ExistingConversation_Success() { // 测试已有会话同步对话
+        ChatRequest req = new ChatRequest(); // 创建聊天请求
+        req.setMessage(TEST_USER_MESSAGE); // 设置用户消息
+        req.setConversationId(TEST_CONVERSATION_ID); // 指定已有会话ID
 
-        // Mock：验证会话存在并属于当前用户
-        Conversation existingConversation = new Conversation();
-        existingConversation.setId(TEST_CONVERSATION_ID);
-        existingConversation.setUserId(TEST_USER_ID);
-        when(conversationService.getConversationById(eq(TEST_USER_ID), eq(TEST_CONVERSATION_ID)))
-                .thenReturn(existingConversation);
+        Conversation existingConversation = new Conversation(); // 创建已有会话
+        existingConversation.setId(TEST_CONVERSATION_ID); // 设置会话ID
+        existingConversation.setUserId(TEST_USER_ID); // 设置用户ID
+        when(conversationService.getConversationById(eq(TEST_USER_ID), eq(TEST_CONVERSATION_ID))).thenReturn(existingConversation); // Mock查询会话
 
-        // Mock：AI同步回复
-        setupMockForSyncChat(TEST_AI_REPLY);
+        setupMockForSyncChat(TEST_AI_REPLY); // 设置同步聊天Mock
 
-        // 执行测试
-        Map<String, Object> result = chatService.chat(req, testUser);
+        Map<String, Object> result = chatService.chat(req, testUser); // 执行聊天
 
-        // 验证返回结果
-        assertNotNull(result, "返回结果不应为空");
-        assertEquals(TEST_CONVERSATION_ID, result.get("conversationId"), "返回的会话ID应正确");
-        assertEquals(TEST_AI_REPLY, result.get("reply"), "返回的AI回复应正确");
+        assertNotNull(result, "返回结果不应为空"); // 结果不为空
+        assertEquals(TEST_CONVERSATION_ID, result.get("conversationId"), "返回的会话ID应正确"); // 会话ID正确
+        assertEquals(TEST_AI_REPLY, result.get("reply"), "返回的AI回复应正确"); // 回复正确
 
-        // 验证服务调用 - 不应创建新会话
-        verify(conversationService, never())
-                .createConversation(anyLong(), anyString(), anyString());
-        verify(conversationService, times(1))
-                .getConversationById(eq(TEST_USER_ID), eq(TEST_CONVERSATION_ID));
-        verify(conversationService, times(1))
-                .saveMessage(eq(TEST_USER_ID), eq(TEST_CONVERSATION_ID), eq("user"), eq(TEST_USER_MESSAGE));
-        verify(conversationService, times(1))
-                .saveMessage(eq(TEST_USER_ID), eq(TEST_CONVERSATION_ID), eq("assistant"), eq(TEST_AI_REPLY));
-    }
+        verify(conversationService, never()).createConversation(anyLong(), anyString(), anyString()); // 验证未创建新会话
+        verify(conversationService, times(1)).getConversationById(eq(TEST_USER_ID), eq(TEST_CONVERSATION_ID)); // 验证查询会话
+        verify(conversationService, times(1)).saveMessage(eq(TEST_USER_ID), eq(TEST_CONVERSATION_ID), eq("user"), eq(TEST_USER_MESSAGE)); // 验证保存用户消息
+        verify(conversationService, times(1)).saveMessage(eq(TEST_USER_ID), eq(TEST_CONVERSATION_ID), eq("assistant"), eq(TEST_AI_REPLY)); // 验证保存助手消息
+    } // testChat_ExistingConversation_Success方法结束
 
-    /**
-     * 测试：AI回复为空时应抛出异常
-     */
     @Test
     @DisplayName("同步对话 - AI回复为空应抛出异常")
-    void testChat_EmptyReply() {
-        // 准备请求对象
-        ChatRequest req = new ChatRequest();
-        req.setMessage(TEST_USER_MESSAGE);
-        req.setConversationId(TEST_CONVERSATION_ID);
+    void testChat_EmptyReply() { // 测试AI回复为空
+        ChatRequest req = new ChatRequest(); // 创建聊天请求
+        req.setMessage(TEST_USER_MESSAGE); // 设置用户消息
+        req.setConversationId(TEST_CONVERSATION_ID); // 设置会话ID
 
-        // Mock：会话验证
-        Conversation conv = new Conversation();
-        conv.setId(TEST_CONVERSATION_ID);
-        conv.setUserId(TEST_USER_ID);
-        when(conversationService.getConversationById(eq(TEST_USER_ID), eq(TEST_CONVERSATION_ID)))
-                .thenReturn(conv);
+        Conversation conv = new Conversation(); // 创建会话
+        conv.setId(TEST_CONVERSATION_ID); // 设置ID
+        conv.setUserId(TEST_USER_ID); // 设置用户ID
+        when(conversationService.getConversationById(eq(TEST_USER_ID), eq(TEST_CONVERSATION_ID))).thenReturn(conv); // Mock查询会话
 
-        // Mock：AI返回空字符串
-        setupMockForSyncChat("");
+        setupMockForSyncChat(""); // Mock AI返回空字符串
 
-        // 执行并验证抛出异常
-        BusinessException exception = assertThrows(BusinessException.class,
+        BusinessException exception = assertThrows(BusinessException.class, // 断言抛出BusinessException
                 () -> chatService.chat(req, testUser), "AI回复为空应抛出BusinessException");
-        assertEquals(ErrorCode.CHAT_AI_CALL_FAILED.getCode(), exception.getCode(),
-                "错误码应为CHAT_AI_CALL_FAILED");
-    }
+        assertEquals(ErrorCode.CHAT_AI_CALL_FAILED.getCode(), exception.getCode(), "错误码应为CHAT_AI_CALL_FAILED"); // 错误码正确
+    } // testChat_EmptyReply方法结束
 
-    /**
-     * 测试：AI调用异常时应抛出业务异常
-     */
     @Test
     @DisplayName("同步对话 - AI调用异常应抛出业务异常")
-    void testChat_AICallException() {
-        // 准备请求对象
-        ChatRequest req = new ChatRequest();
-        req.setMessage(TEST_USER_MESSAGE);
-        req.setConversationId(TEST_CONVERSATION_ID);
+    void testChat_AICallException() { // 测试AI调用异常
+        ChatRequest req = new ChatRequest(); // 创建聊天请求
+        req.setMessage(TEST_USER_MESSAGE); // 设置用户消息
+        req.setConversationId(TEST_CONVERSATION_ID); // 设置会话ID
 
-        // Mock：会话验证
-        Conversation conv = new Conversation();
-        conv.setId(TEST_CONVERSATION_ID);
-        conv.setUserId(TEST_USER_ID);
-        when(conversationService.getConversationById(eq(TEST_USER_ID), eq(TEST_CONVERSATION_ID)))
-                .thenReturn(conv);
+        Conversation conv = new Conversation(); // 创建会话
+        conv.setId(TEST_CONVERSATION_ID); // 设置ID
+        conv.setUserId(TEST_USER_ID); // 设置用户ID
+        when(conversationService.getConversationById(eq(TEST_USER_ID), eq(TEST_CONVERSATION_ID))).thenReturn(conv); // Mock查询会话
 
-        // Mock：AI调用抛出异常
-        when(chatClient.prompt()).thenReturn(requestSpec);
-        when(requestSpec.user(anyString())).thenReturn(requestSpec);
-        when(requestSpec.call()).thenThrow(new RuntimeException("AI服务连接超时"));
+        when(chatClient.prompt()).thenReturn(requestSpec); // Mock prompt
+        when(requestSpec.user(anyString())).thenReturn(requestSpec); // Mock user
+        when(requestSpec.call()).thenThrow(new RuntimeException("AI服务连接超时")); // Mock call抛出异常
 
-        // 执行并验证抛出异常
-        BusinessException exception = assertThrows(BusinessException.class,
+        BusinessException exception = assertThrows(BusinessException.class, // 断言抛出异常
                 () -> chatService.chat(req, testUser), "AI调用异常应抛出BusinessException");
-        assertEquals(ErrorCode.CHAT_AI_CALL_FAILED.getCode(), exception.getCode(),
-                "错误码应为CHAT_AI_CALL_FAILED");
-    }
+        assertEquals(ErrorCode.CHAT_AI_CALL_FAILED.getCode(), exception.getCode(), "错误码应为CHAT_AI_CALL_FAILED"); // 错误码正确
+    } // testChat_AICallException方法结束
 
-    /**
-     * 测试：简单同步对话（不带会话管理）
-     */
     @Test
     @DisplayName("简单对话 - 直接返回AI回复")
-    void testSimpleChat() {
-        // Mock AI回复
-        setupMockForSyncChat(TEST_AI_REPLY);
+    void testSimpleChat() { // 测试简单对话
+        setupMockForSyncChat(TEST_AI_REPLY); // 设置Mock
 
-        // 执行测试
-        String result = chatService.chat(TEST_USER_MESSAGE);
+        String result = chatService.chat(TEST_USER_MESSAGE); // 执行简单对话
 
-        // 验证结果
-        assertEquals(TEST_AI_REPLY, result, "简单对话应直接返回AI回复");
-        // 验证：简单对话不应调用会话服务
-        verifyNoInteractions(conversationService);
-    }
+        assertEquals(TEST_AI_REPLY, result, "简单对话应直接返回AI回复"); // 回复正确
+        verifyNoInteractions(conversationService); // 验证未调用会话服务
+    } // testSimpleChat方法结束
 
-    /**
-     * 测试：简单流式对话
-     */
     @Test
     @DisplayName("简单流式对话 - 返回token流")
-    void testSimpleStreamChat() {
-        // 设置流式Mock
-        String token1 = "Hello";
-        String token2 = " World";
-        setupMockForStreamChat(token1, token2);
+    void testSimpleStreamChat() { // 测试简单流式对话
+        String token1 = "Hello"; // token1
+        String token2 = " World"; // token2
+        setupMockForStreamChat(token1, token2); // 设置流式Mock
 
-        // 执行测试
-        Flux<String> result = chatService.streamChat("Hi");
+        Flux<String> result = chatService.streamChat("Hi"); // 执行流式对话
 
-        // 使用StepVerifier验证流内容
-        StepVerifier.create(result)
-                .expectNext(token1)
-                .expectNext(token2)
-                .verifyComplete();
+        StepVerifier.create(result) // 使用StepVerifier验证流
+                .expectNext(token1) // 期望第一个token
+                .expectNext(token2) // 期望第二个token
+                .verifyComplete(); // 验证流完成
 
-        // 验证：简单流式对话不应调用会话服务
-        verifyNoInteractions(conversationService);
-    }
+        verifyNoInteractions(conversationService); // 验证未调用会话服务
+    } // testSimpleStreamChat方法结束
 
-    /**
-     * 测试：带System Prompt的对话
-     */
     @Test
     @DisplayName("带System Prompt的对话")
-    void testChatWithSystem() {
-        // 准备测试数据
-        String systemPrompt = "你是一个专业的Java程序员";
-        String userMessage = "什么是Spring Boot？";
-        String expectedReply = "Spring Boot是一个快速开发框架...";
+    void testChatWithSystem() { // 测试带System Prompt
+        String systemPrompt = "你是一个专业的Java程序员"; // 系统提示词
+        String userMessage = "什么是Spring Boot？"; // 用户消息
+        String expectedReply = "Spring Boot是一个快速开发框架..."; // 期望回复
 
-        // Mock带系统提示词的调用链
-        when(chatClient.prompt()).thenReturn(requestSpec);
-        when(requestSpec.system(systemPrompt)).thenReturn(requestSpec);
-        when(requestSpec.user(userMessage)).thenReturn(requestSpec);
-        when(requestSpec.call()).thenReturn(callResponseSpec);
-        when(callResponseSpec.content()).thenReturn(expectedReply);
+        when(chatClient.prompt()).thenReturn(requestSpec); // Mock prompt
+        when(requestSpec.system(systemPrompt)).thenReturn(requestSpec); // Mock system
+        when(requestSpec.user(userMessage)).thenReturn(requestSpec); // Mock user
+        when(requestSpec.call()).thenReturn(callResponseSpec); // Mock call
+        when(callResponseSpec.content()).thenReturn(expectedReply); // Mock content返回期望回复
 
-        // 执行测试
-        String result = chatService.chatWithSystem(userMessage, systemPrompt);
+        String result = chatService.chatWithSystem(userMessage, systemPrompt); // 执行带System Prompt对话
 
-        // 验证结果
-        assertEquals(expectedReply, result, "带System Prompt的对话应返回预期回复");
-        verify(requestSpec, times(1)).system(systemPrompt);
-        verify(requestSpec, times(1)).user(userMessage);
-    }
+        assertEquals(expectedReply, result, "带System Prompt的对话应返回预期回复"); // 回复正确
+        verify(requestSpec, times(1)).system(systemPrompt); // 验证system被调用
+        verify(requestSpec, times(1)).user(userMessage); // 验证user被调用
+    } // testChatWithSystem方法结束
 
-    /**
-     * 测试：新会话标题生成 - 长消息自动截断
-     */
     @Test
     @DisplayName("新会话标题 - 长消息自动截断为20字符加省略号")
-    void testNewConversationTitle_LongMessageTruncated() {
-        // 准备超过20字符的长消息
-        String longMessage = "这是一个非常非常非常非常非常非常非常非常长的用户消息内容";
-        ChatRequest req = new ChatRequest();
-        req.setMessage(longMessage);
-        req.setConversationId(null);
+    void testNewConversationTitle_LongMessageTruncated() { // 测试长消息标题截断
+        String longMessage = "这是一个非常非常非常非常非常非常非常非常长的用户消息内容"; // 长消息
+        ChatRequest req = new ChatRequest(); // 创建请求
+        req.setMessage(longMessage); // 设置长消息
+        req.setConversationId(null); // 新会话
 
-        // Mock创建新会话
-        Conversation newConversation = new Conversation();
-        newConversation.setId(TEST_CONVERSATION_ID);
-        newConversation.setUserId(TEST_USER_ID);
-        when(conversationService.createConversation(eq(TEST_USER_ID), anyString(), eq("chat")))
-                .thenReturn(newConversation);
-        setupMockForSyncChat(TEST_AI_REPLY);
+        Conversation newConversation = new Conversation(); // 创建新会话
+        newConversation.setId(TEST_CONVERSATION_ID); // 设置ID
+        newConversation.setUserId(TEST_USER_ID); // 设置用户ID
+        when(conversationService.createConversation(eq(TEST_USER_ID), anyString(), eq("chat"))).thenReturn(newConversation); // Mock创建会话
+        setupMockForSyncChat(TEST_AI_REPLY); // 设置Mock
 
-        // 执行测试
-        chatService.chat(req, testUser);
+        chatService.chat(req, testUser); // 执行聊天
 
-        // 使用ArgumentCaptor捕获创建会话时的标题参数
-        org.mockito.ArgumentCaptor<String> titleCaptor = org.mockito.ArgumentCaptor.forClass(String.class);
-        verify(conversationService, times(1))
-                .createConversation(eq(TEST_USER_ID), titleCaptor.capture(), eq("chat"));
-        String capturedTitle = titleCaptor.getValue();
+        org.mockito.ArgumentCaptor<String> titleCaptor = org.mockito.ArgumentCaptor.forClass(String.class); // 创建标题捕获器
+        verify(conversationService, times(1)).createConversation(eq(TEST_USER_ID), titleCaptor.capture(), eq("chat")); // 捕获标题参数
+        String capturedTitle = titleCaptor.getValue(); // 获取捕获的标题
 
-        // 验证标题被正确截断
-        assertEquals(23, capturedTitle.length(), "长消息标题应为20字符+省略号共23字符");
-        assertTrue(capturedTitle.endsWith("..."), "长消息标题应以省略号结尾");
-    }
+        assertEquals(23, capturedTitle.length(), "长消息标题应为20字符+省略号共23字符"); // 长度23（20字符+3点省略号）
+        assertTrue(capturedTitle.endsWith("..."), "长消息标题应以省略号结尾"); // 以...结尾
+    } // testNewConversationTitle_LongMessageTruncated方法结束
 
-    /**
-     * 测试：新会话标题生成 - 短消息不截断
-     */
     @Test
     @DisplayName("新会话标题 - 短消息保持原样不截断")
-    void testNewConversationTitle_ShortMessage() {
-        // 准备短消息
-        String shortMessage = "你好";
-        ChatRequest req = new ChatRequest();
-        req.setMessage(shortMessage);
-        req.setConversationId(null);
+    void testNewConversationTitle_ShortMessage() { // 测试短消息标题
+        String shortMessage = "你好"; // 短消息
+        ChatRequest req = new ChatRequest(); // 创建请求
+        req.setMessage(shortMessage); // 设置短消息
+        req.setConversationId(null); // 新会话
 
-        // Mock创建新会话
-        Conversation newConversation = new Conversation();
-        newConversation.setId(TEST_CONVERSATION_ID);
-        newConversation.setUserId(TEST_USER_ID);
-        when(conversationService.createConversation(eq(TEST_USER_ID), anyString(), eq("chat")))
-                .thenReturn(newConversation);
-        setupMockForSyncChat(TEST_AI_REPLY);
+        Conversation newConversation = new Conversation(); // 创建新会话
+        newConversation.setId(TEST_CONVERSATION_ID); // 设置ID
+        newConversation.setUserId(TEST_USER_ID); // 设置用户ID
+        when(conversationService.createConversation(eq(TEST_USER_ID), anyString(), eq("chat"))).thenReturn(newConversation); // Mock创建会话
+        setupMockForSyncChat(TEST_AI_REPLY); // 设置Mock
 
-        // 执行测试
-        chatService.chat(req, testUser);
+        chatService.chat(req, testUser); // 执行聊天
 
-        // 使用ArgumentCaptor捕获标题参数
-        org.mockito.ArgumentCaptor<String> titleCaptor = org.mockito.ArgumentCaptor.forClass(String.class);
-        verify(conversationService, times(1))
-                .createConversation(eq(TEST_USER_ID), titleCaptor.capture(), eq("chat"));
+        org.mockito.ArgumentCaptor<String> titleCaptor = org.mockito.ArgumentCaptor.forClass(String.class); // 创建标题捕获器
+        verify(conversationService, times(1)).createConversation(eq(TEST_USER_ID), titleCaptor.capture(), eq("chat")); // 捕获标题
 
-        // 验证短消息标题不截断
-        assertEquals(shortMessage, titleCaptor.getValue(), "短消息标题应保持原样");
-        assertFalse(titleCaptor.getValue().endsWith("..."), "短消息标题不应以省略号结尾");
-    }
-}
+        assertEquals(shortMessage, titleCaptor.getValue(), "短消息标题应保持原样"); // 标题与原消息一致
+        assertFalse(titleCaptor.getValue().endsWith("..."), "短消息标题不应以省略号结尾"); // 不以...结尾
+    } // testNewConversationTitle_ShortMessage方法结束
+} // ChatServiceTest类结束

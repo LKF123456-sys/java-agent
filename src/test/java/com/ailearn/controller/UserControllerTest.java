@@ -1,329 +1,199 @@
-package com.ailearn.controller;
+package com.ailearn.controller; // 声明包名
 
-import com.ailearn.common.BusinessException;
-import com.ailearn.common.ErrorCode;
-import com.ailearn.common.GlobalExceptionHandler;
-import com.ailearn.dto.LoginRequest;
-import com.ailearn.dto.RegisterRequest;
-import com.ailearn.security.UserPrincipal;
-import com.ailearn.service.UserService;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.http.MediaType;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import com.ailearn.common.BusinessException; // 业务异常类
+import com.ailearn.common.ErrorCode; // 错误码枚举
+import com.ailearn.common.GlobalExceptionHandler; // 全局异常处理器
+import com.ailearn.dto.LoginRequest; // 登录请求DTO
+import com.ailearn.dto.RegisterRequest; // 注册请求DTO
+import com.ailearn.security.UserPrincipal; // 用户主体类
+import com.ailearn.service.UserService; // 用户服务
+import com.fasterxml.jackson.databind.ObjectMapper; // Jackson JSON序列化类
+import org.junit.jupiter.api.BeforeEach; // JUnit前置方法注解
+import org.junit.jupiter.api.DisplayName; // JUnit显示名称注解
+import org.junit.jupiter.api.Test; // JUnit测试方法注解
+import org.junit.jupiter.api.extension.ExtendWith; // JUnit扩展注解
+import org.mockito.InjectMocks; // Mockito自动注入注解
+import org.mockito.Mock; // Mockito创建Mock注解
+import org.mockito.junit.jupiter.MockitoExtension; // Mockito JUnit 5扩展
+import org.springframework.http.MediaType; // Spring MediaType常量
+import org.springframework.test.web.servlet.MockMvc; // Spring MockMvc类
+import org.springframework.test.web.servlet.setup.MockMvcBuilders; // Spring MockMvc构建器
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.HashMap; // HashMap实现类
+import java.util.Map; // Map接口
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.mockito.ArgumentMatchers.any; // Mockito参数匹配器
+import static org.mockito.Mockito.when; // Mockito when方法
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get; // MockMvc GET请求构建器
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post; // MockMvc POST请求构建器
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*; // MockMvc结果匹配器
 
-/**
- * 用户控制器集成测试
- * 使用MockMvc模拟HTTP请求，测试用户注册、登录等接口
- * 使用Mockito mock UserService依赖，不加载完整Spring上下文
- *
- * @author AiLearn Platform
- */
-@ExtendWith(MockitoExtension.class)
-@DisplayName("用户控制器测试")
-class UserControllerTest {
+@ExtendWith(MockitoExtension.class) // 启用Mockito扩展
+@DisplayName("用户控制器测试") // 测试类显示名称
+class UserControllerTest { // 用户控制器测试类
 
-    /**
-     * MockMvc实例，用于模拟HTTP请求
-     */
-    private MockMvc mockMvc;
+    private MockMvc mockMvc; // MockMvc实例
 
-    /**
-     * Jackson ObjectMapper，用于JSON序列化/反序列化
-     */
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper = new ObjectMapper(); // Jackson ObjectMapper
 
-    /**
-     * Mock用户服务
-     */
-    @Mock
-    private UserService userService;
+    @Mock // 创建UserService Mock对象
+    private UserService userService; // Mock用户服务
 
-    /**
-     * 被测试的UserController实例，@InjectMocks自动注入mock依赖
-     */
-    @InjectMocks
-    private UserController userController;
+    @InjectMocks // 自动注入Mock到UserController
+    private UserController userController; // 被测用户控制器
 
-    /**
-     * 测试用户名
-     */
-    private static final String TEST_USERNAME = "testuser";
+    private static final String TEST_USERNAME = "testuser"; // 测试用户名
+    private static final String TEST_PASSWORD = "password123"; // 测试密码
+    private static final String TEST_NICKNAME = "测试用户"; // 测试昵称
+    private static final Long TEST_USER_ID = 1L; // 测试用户ID
+    private static final String TEST_ACCESS_TOKEN = "test-access-token"; // 测试Access Token
+    private static final String TEST_REFRESH_TOKEN = "test-refresh-token"; // 测试Refresh Token
 
-    /**
-     * 测试密码
-     */
-    private static final String TEST_PASSWORD = "password123";
+    @BeforeEach // 每个测试前执行
+    void setUp() { // 初始化方法
+        mockMvc = MockMvcBuilders.standaloneSetup(userController) // 构建独立MockMvc
+                .setControllerAdvice(new GlobalExceptionHandler()) // 注册全局异常处理器
+                .build(); // 构建MockMvc
+    } // setUp方法结束
 
-    /**
-     * 测试昵称
-     */
-    private static final String TEST_NICKNAME = "测试用户";
-
-    /**
-     * 测试用户ID
-     */
-    private static final Long TEST_USER_ID = 1L;
-
-    /**
-     * 测试Access Token
-     */
-    private static final String TEST_ACCESS_TOKEN = "test-access-token";
-
-    /**
-     * 测试Refresh Token
-     */
-    private static final String TEST_REFRESH_TOKEN = "test-refresh-token";
-
-    /**
-     * 每个测试方法执行前初始化MockMvc
-     * 注册GlobalExceptionHandler处理异常
-     */
-    @BeforeEach
-    void setUp() {
-        // 构建独立MockMvc，注册Controller和全局异常处理器
-        mockMvc = MockMvcBuilders.standaloneSetup(userController)
-                .setControllerAdvice(new GlobalExceptionHandler())
-                .build();
-    }
-
-    /**
-     * 测试用户注册成功场景
-     * POST /api/auth/register
-     * 验证：返回200，包含用户信息和双Token
-     */
     @Test
     @DisplayName("POST /api/auth/register - 注册成功")
-    void testRegister_Success() throws Exception {
-        // 准备：注册请求参数
-        RegisterRequest req = new RegisterRequest();
-        req.setUsername(TEST_USERNAME);
-        req.setPassword(TEST_PASSWORD);
-        req.setNickname(TEST_NICKNAME);
+    void testRegister_Success() throws Exception { // 测试注册成功
+        RegisterRequest req = new RegisterRequest(); // 创建注册请求
+        req.setUsername(TEST_USERNAME); // 设置用户名
+        req.setPassword(TEST_PASSWORD); // 设置密码
+        req.setNickname(TEST_NICKNAME); // 设置昵称
 
-        // 准备：Mock UserService返回结果
-        UserPrincipal userPrincipal = UserPrincipal.create(TEST_USER_ID, TEST_USERNAME, "user");
-        Map<String, Object> serviceResult = new HashMap<>();
-        serviceResult.put("user", userPrincipal);
-        serviceResult.put("accessToken", TEST_ACCESS_TOKEN);
-        serviceResult.put("refreshToken", TEST_REFRESH_TOKEN);
+        UserPrincipal userPrincipal = UserPrincipal.create(TEST_USER_ID, TEST_USERNAME, "user"); // 创建用户主体
+        Map<String, Object> serviceResult = new HashMap<>(); // 创建服务返回结果
+        serviceResult.put("user", userPrincipal); // 放入用户信息
+        serviceResult.put("accessToken", TEST_ACCESS_TOKEN); // 放入Access Token
+        serviceResult.put("refreshToken", TEST_REFRESH_TOKEN); // 放入Refresh Token
 
-        // Mock：register方法返回成功结果
-        when(userService.register(any(RegisterRequest.class))).thenReturn(serviceResult);
+        when(userService.register(any(RegisterRequest.class))).thenReturn(serviceResult); // Mock register方法返回成功
 
-        // 执行：发送POST注册请求
-        mockMvc.perform(post("/api/auth/register")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(req)))
-                // 验证：HTTP状态为200
-                .andExpect(status().isOk())
-                // 验证：返回JSON格式
-                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                // 验证：业务code为200
-                .andExpect(jsonPath("$.code").value(200))
-                // 验证：消息为success
-                .andExpect(jsonPath("$.message").value("success"))
-                // 验证：返回用户信息
-                .andExpect(jsonPath("$.data.user.userId").value(TEST_USER_ID))
-                .andExpect(jsonPath("$.data.user.username").value(TEST_USERNAME))
-                // 验证：返回Token
-                .andExpect(jsonPath("$.data.accessToken").value(TEST_ACCESS_TOKEN))
-                .andExpect(jsonPath("$.data.refreshToken").value(TEST_REFRESH_TOKEN));
-    }
+        mockMvc.perform(post("/api/auth/register") // 执行POST注册请求
+                        .contentType(MediaType.APPLICATION_JSON) // 设置Content-Type
+                        .content(objectMapper.writeValueAsString(req))) // 设置请求体JSON
+                .andExpect(status().isOk()) // 期望HTTP 200
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON)) // 期望JSON响应
+                .andExpect(jsonPath("$.code").value(200)) // 期望业务code为200
+                .andExpect(jsonPath("$.message").value("success")) // 期望message为success
+                .andExpect(jsonPath("$.data.user.userId").value(TEST_USER_ID)) // 期望用户ID正确
+                .andExpect(jsonPath("$.data.user.username").value(TEST_USERNAME)) // 期望用户名正确
+                .andExpect(jsonPath("$.data.accessToken").value(TEST_ACCESS_TOKEN)) // 期望Access Token正确
+                .andExpect(jsonPath("$.data.refreshToken").value(TEST_REFRESH_TOKEN)); // 期望Refresh Token正确
+    } // testRegister_Success方法结束
 
-    /**
-     * 测试用户注册时用户名已存在
-     * 验证：返回业务错误
-     */
     @Test
     @DisplayName("POST /api/auth/register - 用户名已存在返回错误")
-    void testRegister_UsernameExists() throws Exception {
-        // 准备：注册请求参数
-        RegisterRequest req = new RegisterRequest();
-        req.setUsername(TEST_USERNAME);
-        req.setPassword(TEST_PASSWORD);
+    void testRegister_UsernameExists() throws Exception { // 测试注册用户名已存在
+        RegisterRequest req = new RegisterRequest(); // 创建注册请求
+        req.setUsername(TEST_USERNAME); // 设置用户名
+        req.setPassword(TEST_PASSWORD); // 设置密码
 
-        // Mock：register方法抛出用户名已存在异常
-        when(userService.register(any(RegisterRequest.class)))
+        when(userService.register(any(RegisterRequest.class))) // Mock register抛出异常
                 .thenThrow(new BusinessException(ErrorCode.USER_USERNAME_EXISTS));
 
-        // 执行：发送POST注册请求
-        mockMvc.perform(post("/api/auth/register")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(req)))
-                // 验证：HTTP状态为200（业务异常正常返回）
-                .andExpect(status().isOk())
-                // 验证：业务错误码正确
-                .andExpect(jsonPath("$.code").value(ErrorCode.USER_USERNAME_EXISTS.getCode()))
-                // 验证：错误消息正确
-                .andExpect(jsonPath("$.message").value(ErrorCode.USER_USERNAME_EXISTS.getMessage()));
-    }
+        mockMvc.perform(post("/api/auth/register") // 执行POST请求
+                        .contentType(MediaType.APPLICATION_JSON) // 设置Content-Type
+                        .content(objectMapper.writeValueAsString(req))) // 设置请求体
+                .andExpect(status().isOk()) // 期望HTTP 200（业务异常正常返回）
+                .andExpect(jsonPath("$.code").value(ErrorCode.USER_USERNAME_EXISTS.getCode())) // 期望错误码正确
+                .andExpect(jsonPath("$.message").value(ErrorCode.USER_USERNAME_EXISTS.getMessage())); // 期望错误消息正确
+    } // testRegister_UsernameExists方法结束
 
-    /**
-     * 测试用户注册参数校验失败（用户名太短）
-     * 验证：返回参数错误
-     */
     @Test
     @DisplayName("POST /api/auth/register - 参数校验失败返回400")
-    void testRegister_ValidationError() throws Exception {
-        // 准备：无效的注册请求（用户名为空）
-        RegisterRequest req = new RegisterRequest();
-        req.setUsername(""); // 空用户名
-        req.setPassword(TEST_PASSWORD);
+    void testRegister_ValidationError() throws Exception { // 测试注册参数校验失败
+        RegisterRequest req = new RegisterRequest(); // 创建注册请求
+        req.setUsername(""); // 用户名为空（无效）
+        req.setPassword(TEST_PASSWORD); // 设置密码
 
-        // 执行：发送POST注册请求
-        mockMvc.perform(post("/api/auth/register")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(req)))
-                // 验证：由于standaloneSetup不自动执行@Valid校验，这里验证请求能到达controller
-                // 实际Spring环境下@Valid会触发MethodArgumentNotValidException
-                .andExpect(status().isBadRequest());
-    }
+        mockMvc.perform(post("/api/auth/register") // 执行POST请求
+                        .contentType(MediaType.APPLICATION_JSON) // 设置Content-Type
+                        .content(objectMapper.writeValueAsString(req))) // 设置请求体
+                .andExpect(status().isBadRequest()); // 期望HTTP 400
+    } // testRegister_ValidationError方法结束
 
-    /**
-     * 测试用户登录成功场景
-     * POST /api/auth/login
-     * 验证：返回200，包含用户信息和双Token
-     */
     @Test
     @DisplayName("POST /api/auth/login - 登录成功")
-    void testLogin_Success() throws Exception {
-        // 准备：登录请求参数
-        LoginRequest req = new LoginRequest();
-        req.setUsername(TEST_USERNAME);
-        req.setPassword(TEST_PASSWORD);
+    void testLogin_Success() throws Exception { // 测试登录成功
+        LoginRequest req = new LoginRequest(); // 创建登录请求
+        req.setUsername(TEST_USERNAME); // 设置用户名
+        req.setPassword(TEST_PASSWORD); // 设置密码
 
-        // 准备：Mock UserService返回结果
-        UserPrincipal userPrincipal = UserPrincipal.create(TEST_USER_ID, TEST_USERNAME, "user");
-        Map<String, Object> serviceResult = new HashMap<>();
-        serviceResult.put("user", userPrincipal);
-        serviceResult.put("accessToken", TEST_ACCESS_TOKEN);
-        serviceResult.put("refreshToken", TEST_REFRESH_TOKEN);
+        UserPrincipal userPrincipal = UserPrincipal.create(TEST_USER_ID, TEST_USERNAME, "user"); // 创建用户主体
+        Map<String, Object> serviceResult = new HashMap<>(); // 创建服务返回结果
+        serviceResult.put("user", userPrincipal); // 放入用户信息
+        serviceResult.put("accessToken", TEST_ACCESS_TOKEN); // 放入Access Token
+        serviceResult.put("refreshToken", TEST_REFRESH_TOKEN); // 放入Refresh Token
 
-        // Mock：login方法返回成功结果
-        when(userService.login(any(LoginRequest.class))).thenReturn(serviceResult);
+        when(userService.login(any(LoginRequest.class))).thenReturn(serviceResult); // Mock login返回成功
 
-        // 执行：发送POST登录请求
-        mockMvc.perform(post("/api/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(req)))
-                // 验证：HTTP状态为200
-                .andExpect(status().isOk())
-                // 验证：业务code为200
-                .andExpect(jsonPath("$.code").value(200))
-                // 验证：消息为success
-                .andExpect(jsonPath("$.message").value("success"))
-                // 验证：返回用户信息
-                .andExpect(jsonPath("$.data.user.userId").value(TEST_USER_ID))
-                .andExpect(jsonPath("$.data.user.username").value(TEST_USERNAME))
-                // 验证：返回Token
-                .andExpect(jsonPath("$.data.accessToken").value(TEST_ACCESS_TOKEN))
-                .andExpect(jsonPath("$.data.refreshToken").value(TEST_REFRESH_TOKEN));
-    }
+        mockMvc.perform(post("/api/auth/login") // 执行POST登录请求
+                        .contentType(MediaType.APPLICATION_JSON) // 设置Content-Type
+                        .content(objectMapper.writeValueAsString(req))) // 设置请求体
+                .andExpect(status().isOk()) // 期望HTTP 200
+                .andExpect(jsonPath("$.code").value(200)) // 期望业务code为200
+                .andExpect(jsonPath("$.message").value("success")) // 期望message为success
+                .andExpect(jsonPath("$.data.user.userId").value(TEST_USER_ID)) // 期望用户ID正确
+                .andExpect(jsonPath("$.data.user.username").value(TEST_USERNAME)) // 期望用户名正确
+                .andExpect(jsonPath("$.data.accessToken").value(TEST_ACCESS_TOKEN)) // 期望Access Token正确
+                .andExpect(jsonPath("$.data.refreshToken").value(TEST_REFRESH_TOKEN)); // 期望Refresh Token正确
+    } // testLogin_Success方法结束
 
-    /**
-     * 测试用户登录密码错误
-     * 验证：返回登录失败错误
-     */
     @Test
     @DisplayName("POST /api/auth/login - 密码错误返回错误")
-    void testLogin_WrongPassword() throws Exception {
-        // 准备：登录请求参数
-        LoginRequest req = new LoginRequest();
-        req.setUsername(TEST_USERNAME);
-        req.setPassword("wrongpassword");
+    void testLogin_WrongPassword() throws Exception { // 测试登录密码错误
+        LoginRequest req = new LoginRequest(); // 创建登录请求
+        req.setUsername(TEST_USERNAME); // 设置用户名
+        req.setPassword("wrongpassword"); // 错误密码
 
-        // Mock：login方法抛出登录失败异常
-        when(userService.login(any(LoginRequest.class)))
+        when(userService.login(any(LoginRequest.class))) // Mock login抛出异常
                 .thenThrow(new BusinessException(ErrorCode.AUTH_LOGIN_FAILED));
 
-        // 执行：发送POST登录请求
-        mockMvc.perform(post("/api/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(req)))
-                // 验证：HTTP状态为200（业务异常正常返回）
-                .andExpect(status().isOk())
-                // 验证：业务错误码正确
-                .andExpect(jsonPath("$.code").value(ErrorCode.AUTH_LOGIN_FAILED.getCode()))
-                // 验证：错误消息正确
-                .andExpect(jsonPath("$.message").value(ErrorCode.AUTH_LOGIN_FAILED.getMessage()));
-    }
+        mockMvc.perform(post("/api/auth/login") // 执行POST请求
+                        .contentType(MediaType.APPLICATION_JSON) // 设置Content-Type
+                        .content(objectMapper.writeValueAsString(req))) // 设置请求体
+                .andExpect(status().isOk()) // 期望HTTP 200
+                .andExpect(jsonPath("$.code").value(ErrorCode.AUTH_LOGIN_FAILED.getCode())) // 期望错误码正确
+                .andExpect(jsonPath("$.message").value(ErrorCode.AUTH_LOGIN_FAILED.getMessage())); // 期望错误消息正确
+    } // testLogin_WrongPassword方法结束
 
-    /**
-     * 测试用户登录用户不存在
-     * 验证：返回登录失败错误（不透露是用户名还是密码错误）
-     */
     @Test
     @DisplayName("POST /api/auth/login - 用户不存在返回登录失败")
-    void testLogin_UserNotFound() throws Exception {
-        // 准备：登录请求参数
-        LoginRequest req = new LoginRequest();
-        req.setUsername("nonexistent");
-        req.setPassword(TEST_PASSWORD);
+    void testLogin_UserNotFound() throws Exception { // 测试登录用户不存在
+        LoginRequest req = new LoginRequest(); // 创建登录请求
+        req.setUsername("nonexistent"); // 不存在的用户名
+        req.setPassword(TEST_PASSWORD); // 设置密码
 
-        // Mock：login方法抛出登录失败异常
-        when(userService.login(any(LoginRequest.class)))
+        when(userService.login(any(LoginRequest.class))) // Mock login抛出异常
                 .thenThrow(new BusinessException(ErrorCode.AUTH_LOGIN_FAILED));
 
-        // 执行
-        mockMvc.perform(post("/api/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(req)))
-                // 验证
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(ErrorCode.AUTH_LOGIN_FAILED.getCode()));
-    }
+        mockMvc.perform(post("/api/auth/login") // 执行POST请求
+                        .contentType(MediaType.APPLICATION_JSON) // 设置Content-Type
+                        .content(objectMapper.writeValueAsString(req))) // 设置请求体
+                .andExpect(status().isOk()) // 期望HTTP 200
+                .andExpect(jsonPath("$.code").value(ErrorCode.AUTH_LOGIN_FAILED.getCode())); // 期望错误码正确
+    } // testLogin_UserNotFound方法结束
 
-    /**
-     * 测试获取当前用户信息接口（未配置Security的standalone测试）
-     * 注意：在standaloneSetup中Spring Security不生效，请求不会被拦截
-     * 实际Spring环境下未携带Token访问/api/auth/me会返回401
-     * 此测试仅验证接口能正常访问并返回结果
-     */
     @Test
     @DisplayName("GET /api/auth/me - 获取当前用户信息（standalone测试）")
-    void testGetCurrentUser() throws Exception {
-        // standaloneSetup不加载Spring Security，所以请求不会被拦截
-        // SecurityContextHolder中没有认证信息时，返回null用户
+    void testGetCurrentUser() throws Exception { // 测试获取当前用户信息
+        mockMvc.perform(get("/api/auth/me") // 执行GET请求
+                        .contentType(MediaType.APPLICATION_JSON)) // 设置Content-Type
+                .andExpect(status().isOk()) // 期望HTTP 200
+                .andExpect(jsonPath("$.code").value(200)) // 期望业务code为200
+                .andExpect(jsonPath("$.data").isEmpty()); // 期望data为空（无认证信息）
+    } // testGetCurrentUser方法结束
 
-        // 执行：发送GET请求获取当前用户
-        mockMvc.perform(get("/api/auth/me")
-                        .contentType(MediaType.APPLICATION_JSON))
-                // 验证：HTTP状态为200
-                .andExpect(status().isOk())
-                // 验证：业务code为200
-                .andExpect(jsonPath("$.code").value(200))
-                // 验证：data为null（无认证信息）
-                .andExpect(jsonPath("$.data").isEmpty());
-    }
-
-    /**
-     * 测试请求体为空时的处理
-     */
     @Test
     @DisplayName("POST /api/auth/login - 请求体为空返回400错误")
-    void testLogin_EmptyBody() throws Exception {
-        // 执行：发送空请求体
-        mockMvc.perform(post("/api/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{}"))
-                // 验证：空请求体或缺少必填字段会触发参数校验，返回400状态码
-                .andExpect(status().isBadRequest());
-    }
-}
+    void testLogin_EmptyBody() throws Exception { // 测试登录空请求体
+        mockMvc.perform(post("/api/auth/login") // 执行POST请求
+                        .contentType(MediaType.APPLICATION_JSON) // 设置Content-Type
+                        .content("{}")) // 空JSON请求体
+                .andExpect(status().isBadRequest()); // 期望HTTP 400
+    } // testLogin_EmptyBody方法结束
+} // UserControllerTest类结束
