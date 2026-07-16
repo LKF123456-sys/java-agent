@@ -61,7 +61,7 @@
           />
         </el-scrollbar>
 
-        <ChatInput @send="handleSendMessage" :disabled="isLoading || !selectedAgent" placeholder="请选择Agent类型后输入消息..." />
+        <ChatInput @send="handleSendMessage" :disabled="isLoading" placeholder="输入消息开始对话..." />
       </el-col>
     </el-row>
   </div>
@@ -75,10 +75,11 @@ import ChatMessage from '@/components/ChatMessage.vue'
 import ChatInput from '@/components/ChatInput.vue'
 import { agentChat } from '@/api'
 
-const selectedAgent = ref('')
+const selectedAgent = ref('code')
 const messages = ref([])
 const isLoading = ref(false)
 const messagesRef = ref(null)
+const currentConversationId = ref(null)
 let currentSSE = null
 
 const agentTypes = [
@@ -133,13 +134,18 @@ const handleSendMessage = async (content) => {
   isLoading.value = true
   scrollToBottom()
 
+  const onMessage = (data) => {
+    if (data.content) {
+      assistantMessage.content += data.content
+      scrollToBottom()
+    }
+  }
+  onMessage._conversationIdCallback = (convId) => {
+    currentConversationId.value = convId
+  }
+
   try {
-    currentSSE = agentChat(content, (data) => {
-      if (data.content) {
-        assistantMessage.content += data.content
-        scrollToBottom()
-      }
-    })
+    currentSSE = agentChat(content, currentConversationId.value, onMessage)
     await currentSSE
   } catch (error) {
     console.error('Agent chat error:', error)
@@ -153,6 +159,7 @@ const handleSendMessage = async (content) => {
 
 watch(selectedAgent, () => {
   messages.value = []
+  currentConversationId.value = null
 })
 
 onUnmounted(() => {

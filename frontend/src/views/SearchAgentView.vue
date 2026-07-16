@@ -49,6 +49,7 @@ import { searchAgentChat } from '@/api'
 const messages = ref([])
 const isLoading = ref(false)
 const messagesRef = ref(null)
+const currentConversationId = ref(null)
 let currentSSE = null
 
 const scrollToBottom = () => {
@@ -87,13 +88,18 @@ const handleSendMessage = async (content) => {
   isLoading.value = true
   scrollToBottom()
 
+  const onMessage = (data) => {
+    if (data.content) {
+      assistantMessage.content += data.content
+      scrollToBottom()
+    }
+  }
+  onMessage._conversationIdCallback = (convId) => {
+    currentConversationId.value = convId
+  }
+
   try {
-    currentSSE = searchAgentChat(content, (data) => {
-      if (data.content) {
-        assistantMessage.content += data.content
-        scrollToBottom()
-      }
-    })
+    currentSSE = searchAgentChat(content, currentConversationId.value, onMessage)
     await currentSSE
   } catch (error) {
     console.error('Search agent chat error:', error)

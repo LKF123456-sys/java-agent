@@ -162,6 +162,7 @@ public class SearchAgentService {
         }
 
         conversationService.saveMessage(userId, finalConversationId, "user", task);
+        final Long convId = finalConversationId;
         final Long uid = userId;
 
         StringBuilder responseBuilder = new StringBuilder();
@@ -171,7 +172,7 @@ public class SearchAgentService {
             try {
                 return buildUserPromptWithSearch(task);
             } catch (Exception e) {
-                log.error("联网搜索失败: conversationId={}, error={}", finalConversationId, e.getMessage(), e);
+                log.error("联网搜索失败: conversationId={}, error={}", convId, e.getMessage(), e);
                 return "用户问题：" + task + "\n\n注意：联网搜索暂时不可用，请基于你的知识回答并告知用户。";
             }
         }).subscribeOn(Schedulers.boundedElastic());

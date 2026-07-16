@@ -66,6 +66,7 @@ const messages = ref([])
 const executionSteps = ref([])
 const isLoading = ref(false)
 const messagesRef = ref(null)
+const currentConversationId = ref(null)
 let currentSSE = null
 
 const agentMap = {
@@ -135,16 +136,21 @@ const handleSendMessage = async (content) => {
   isLoading.value = true
   scrollToBottom()
 
+  const onMessage = (data) => {
+    if (data.step && data.agent) {
+      addExecutionStep(data.agent, data.step, data.status || 'completed')
+    }
+    if (data.content) {
+      assistantMessage.content += data.content
+      scrollToBottom()
+    }
+  }
+  onMessage._conversationIdCallback = (convId) => {
+    currentConversationId.value = convId
+  }
+
   try {
-    currentSSE = multiAgentChat(content, (data) => {
-      if (data.step && data.agent) {
-        addExecutionStep(data.agent, data.step, data.status || 'completed')
-      }
-      if (data.content) {
-        assistantMessage.content += data.content
-        scrollToBottom()
-      }
-    })
+    currentSSE = multiAgentChat(content, currentConversationId.value, onMessage)
     await currentSSE
   } catch (error) {
     console.error('Multi agent chat error:', error)

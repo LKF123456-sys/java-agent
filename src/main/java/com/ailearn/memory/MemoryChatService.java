@@ -87,21 +87,33 @@ public class MemoryChatService {
         Long userId = user.getUserId();
         Long conversationId = ensureConversation(userId, req.getConversationId(), req.getMessage(), "memory");
         String convIdStr = String.valueOf(conversationId);
+        final Long convId = conversationId;
+        final Long uid = userId;
+
+        conversationService.saveMessage(userId, conversationId, "user", req.getMessage());
 
         StringBuilder fullReply = new StringBuilder();
 
         return chatClient.prompt()
-                .user(req.getMessage())
-                .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, convIdStr))
-                .stream()
-                .content()
-                .doOnNext(fullReply::append)
+                    .user(req.getMessage())
+                    .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, convIdStr))
+                    .stream()
+                    .content()
+                .doOnNext(chunk -> {
+                    if (chunk != null) {
+                        fullReply.append(chunk);
+                    }
+                })
                 .doOnComplete(() -> {
+                    String aiReply = fullReply.toString();
+                    if (aiReply != null && !aiReply.isEmpty()) {
+                        conversationService.saveMessage(uid, convId, "assistant", aiReply);
+                    }
                     log.info("记忆流式对话完成: userId={}, conversationId={}, replyLength={}",
-                            user.getUserId(), conversationId, fullReply.length());
+                            uid, convId, fullReply.length());
                 })
                 .doOnError(e -> log.error("记忆流式对话错误: conversationId={}, error={}",
-                        conversationId, e.getMessage(), e))
+                        convId, e.getMessage(), e))
                 .onErrorResume(e -> Flux.just("[ERROR] " + (e.getMessage() != null ? e.getMessage() : "AI调用失败")));
     }
 

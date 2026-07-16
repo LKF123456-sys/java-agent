@@ -73,6 +73,31 @@ const createMultiAgentStream = (url, onMessage) => {
         
         try {
           const parsed = JSON.parse(data)
+          if (parsed.type === 'init' && parsed.content && onMessage._conversationIdCallback) {
+            onMessage._conversationIdCallback(parsed.content)
+            return
+          }
+          if (parsed.type === 'done') {
+            return
+          }
+          if (parsed.type === 'error') {
+            hasError = true
+            reject(new Error(parsed.content || '多Agent协作失败'))
+            return
+          }
+          if (parsed.type === 'agent_start' && parsed.agent) {
+            onMessage({ step: parsed.content || '开始执行', agent: parsed.agent, status: 'active' })
+            return
+          }
+          if (parsed.type === 'agent_end' && parsed.agent) {
+            onMessage({ step: '执行完成', agent: parsed.agent, status: 'completed' })
+            return
+          }
+          if (parsed.type === 'token' && parsed.content) {
+            fullContent += parsed.content
+            onMessage({ content: parsed.content })
+            return
+          }
           if (parsed.step && parsed.agent) {
             onMessage(parsed)
           }
@@ -119,32 +144,47 @@ export const streamChat = (message, conversationId, onMessage) => {
 }
 
 // Agent聊天API
-export const agentChat = (message, onMessage) => {
-  const url = `/api/agent/stream?task=${encodeURIComponent(message)}`
+export const agentChat = (message, conversationId, onMessage) => {
+  let url = `/api/agent/stream?task=${encodeURIComponent(message)}`
+  if (conversationId) {
+    url += `&conversationId=${conversationId}`
+  }
   return createStreamChat(url, onMessage)
 }
 
 // 搜索Agent聊天API
-export const searchAgentChat = (message, onMessage) => {
-  const url = `/api/search-agent/stream?task=${encodeURIComponent(message)}`
+export const searchAgentChat = (message, conversationId, onMessage) => {
+  let url = `/api/search-agent/stream?task=${encodeURIComponent(message)}`
+  if (conversationId) {
+    url += `&conversationId=${conversationId}`
+  }
   return createStreamChat(url, onMessage)
 }
 
 // 多Agent聊天API
-export const multiAgentChat = (message, onMessage) => {
-  const url = `/api/multi-agent/stream?task=${encodeURIComponent(message)}`
+export const multiAgentChat = (message, conversationId, onMessage) => {
+  let url = `/api/multi-agent/stream?task=${encodeURIComponent(message)}`
+  if (conversationId) {
+    url += `&conversationId=${conversationId}`
+  }
   return createMultiAgentStream(url, onMessage)
 }
 
 // 记忆聊天API
-export const memoryChat = (message, onMessage) => {
-  const url = `/api/memory/stream?message=${encodeURIComponent(message)}`
+export const memoryChat = (message, conversationId, onMessage) => {
+  let url = `/api/memory/stream?message=${encodeURIComponent(message)}`
+  if (conversationId) {
+    url += `&conversationId=${conversationId}`
+  }
   return createStreamChat(url, onMessage)
 }
 
 // RAG聊天API
-export const ragChat = (question, onMessage) => {
-  const url = `/api/rag/ask/stream?question=${encodeURIComponent(question)}`
+export const ragChat = (question, conversationId, onMessage) => {
+  let url = `/api/rag/ask/stream?question=${encodeURIComponent(question)}`
+  if (conversationId) {
+    url += `&conversationId=${conversationId}`
+  }
   return createStreamChat(url, onMessage)
 }
 

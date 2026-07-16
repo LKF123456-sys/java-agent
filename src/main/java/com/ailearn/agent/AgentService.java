@@ -161,10 +161,10 @@ public class AgentService {
         StringBuilder fullReply = new StringBuilder();
 
         return agentClient.prompt()
-                .user(task)
-                .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, "agent_" + convId))
-                .stream()
-                .content()
+                    .user(task)
+                    .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, "agent_" + convId))
+                    .stream()
+                    .content()
                 .doOnNext(chunk -> {
                     if (chunk != null) {
                         fullReply.append(chunk);

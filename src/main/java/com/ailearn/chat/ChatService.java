@@ -86,10 +86,14 @@ public class ChatService {
         StringBuilder fullReply = new StringBuilder();
 
         return chatClient.prompt()
-                .user(req.getMessage())
-                .stream()
-                .content()
-                .doOnNext(fullReply::append)
+                    .user(req.getMessage())
+                    .stream()
+                    .content()
+                .doOnNext(chunk -> {
+                    if (chunk != null) {
+                        fullReply.append(chunk);
+                    }
+                })
                 .doOnComplete(() -> {
                     String aiReply = fullReply.toString();
                     if (!aiReply.isEmpty()) {

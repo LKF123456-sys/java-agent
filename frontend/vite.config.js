@@ -14,7 +14,23 @@ export default defineConfig({
     proxy: {
       '/api': {
         target: 'http://localhost:8080',
-        changeOrigin: true
+        changeOrigin: true,
+        ws: true,
+        configure: (proxy, _options) => {
+          proxy.on('proxyReq', (proxyReq, req, res) => {
+            proxyReq.setHeader('Accept', 'text/event-stream');
+            proxyReq.setHeader('Cache-Control', 'no-cache');
+          });
+          proxy.on('proxyRes', (proxyRes, req, res) => {
+            if (proxyRes.headers['content-type'] && 
+                proxyRes.headers['content-type'].includes('text/event-stream')) {
+              delete proxyRes.headers['content-length'];
+              proxyRes.headers['cache-control'] = 'no-cache, no-transform';
+              proxyRes.headers['x-accel-buffering'] = 'no';
+              proxyRes.headers['connection'] = 'keep-alive';
+            }
+          });
+        }
       }
     }
   }

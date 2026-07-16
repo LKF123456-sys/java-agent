@@ -216,41 +216,39 @@ export const createSSEConnection = (url, handlers = {}) => {
       const reader = response.body.getReader()
       const decoder = new TextDecoder()
       let buffer = ''
+      let currentEventData = ''
 
       while (!isClosed) {
         const { done, value } = await reader.read()
         if (done) break
 
         buffer += decoder.decode(value, { stream: true })
-        const lines = buffer.split('\n')
-        buffer = lines.pop() || ''
+        
+        let newlineIndex
+        while ((newlineIndex = buffer.indexOf('\n')) !== -1) {
+          const line = buffer.substring(0, newlineIndex)
+          buffer = buffer.substring(newlineIndex + 1)
 
-        let data = ''
-
-        for (const line of lines) {
-          if (line.startsWith('data:')) {
-            const lineData = line.slice(5)
-            data += lineData.startsWith(' ') ? lineData.slice(1) : lineData
-          } else if (line === '') {
-            if (data && onMessage) {
-              onMessage(data)
+          if (line === '') {
+            if (currentEventData) {
+              if (onMessage) {
+                onMessage(currentEventData)
+              }
+              currentEventData = ''
             }
-            data = ''
+          } else if (line.startsWith('data:')) {
+            let data = line.slice(5)
+            if (data.startsWith(' ')) {
+              data = data.slice(1)
+            }
+            currentEventData += data
           }
         }
       }
 
-      if (buffer) {
-        const lines = buffer.split('\n')
-        let data = ''
-        for (const line of lines) {
-          if (line.startsWith('data:')) {
-            const lineData = line.slice(5)
-            data += lineData.startsWith(' ') ? lineData.slice(1) : lineData
-          }
-        }
-        if (data && onMessage) {
-          onMessage(data)
+      if (currentEventData && !isClosed) {
+        if (onMessage) {
+          onMessage(currentEventData)
         }
       }
 

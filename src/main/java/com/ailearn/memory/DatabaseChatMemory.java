@@ -33,6 +33,12 @@ import java.util.List;
 public class DatabaseChatMemory implements ChatMemory {
 
     /**
+     * 默认保留的最近历史消息对数（一对=一问一答）
+     * 限制为20条消息（10轮对话），避免上下文过长导致Ollama模型报错
+     */
+    private static final int DEFAULT_MAX_HISTORY_MESSAGES = 20;
+
+    /**
      * 聊天消息数据访问接口
      * 用于chat_message表的CRUD操作
      */
@@ -50,6 +56,10 @@ public class DatabaseChatMemory implements ChatMemory {
         log.debug("添加消息到会话记忆: conversationId={}, messageCount={}",
                 conversationId, messages.size());
         Long convId = parseConversationId(conversationId);
+        if (convId == null) {
+            log.warn("无法解析会话ID，跳过消息保存: conversationId={}", conversationId);
+            return;
+        }
 
         for (Message message : messages) {
             saveSingleMessage(convId, message);
@@ -58,15 +68,15 @@ public class DatabaseChatMemory implements ChatMemory {
     }
 
     /**
-     * 获取指定会话的所有消息
-     * 默认获取该会话的全部历史消息（调用get(conversationId, Integer.MAX_VALUE)）
+     * 获取指定会话的最近N条消息
+     * 默认获取最近20条消息（10轮对话），防止上下文过长导致模型调用失败
      *
      * @param conversationId 会话ID字符串
      * @return List&lt;Message&gt; 按时间正序排列的消息列表（最早的消息在前）
      */
     @Override
     public List<Message> get(String conversationId) {
-        return get(conversationId, Integer.MAX_VALUE);
+        return get(conversationId, DEFAULT_MAX_HISTORY_MESSAGES);
     }
 
     /**
@@ -80,6 +90,10 @@ public class DatabaseChatMemory implements ChatMemory {
     public List<Message> get(String conversationId, int lastN) {
         log.debug("获取会话消息: conversationId={}, lastN={}", conversationId, lastN);
         Long convId = parseConversationId(conversationId);
+        if (convId == null) {
+            log.warn("无法解析会话ID，返回空消息列表: conversationId={}", conversationId);
+            return new ArrayList<>();
+        }
 
         // 构建查询条件，按ID倒序（先获取最新的消息）
         LambdaQueryWrapper<ChatMessage> wrapper = new LambdaQueryWrapper<>();
@@ -120,6 +134,10 @@ public class DatabaseChatMemory implements ChatMemory {
     public void clear(String conversationId) {
         log.info("清除会话记忆: conversationId={}", conversationId);
         Long convId = parseConversationId(conversationId);
+        if (convId == null) {
+            log.warn("无法解析会话ID，跳过清除: conversationId={}", conversationId);
+            return;
+        }
 
         LambdaQueryWrapper<ChatMessage> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(ChatMessage::getConversationId, convId);
@@ -130,17 +148,51 @@ public class DatabaseChatMemory implements ChatMemory {
 
     /**
      * 解析会话ID字符串为Long类型
-     * 支持数字格式的会话ID，解析失败返回-1（会导致查询不到数据，安全降级）
+     * 支持多种格式的会话ID：
+     * 1. 纯数字格式："56" → 56
+     * 2. 带前缀格式："agent_56"、"chat_123"、"task_456" → 提取前缀后的数字部分
+     * 3. 包含数字的字符串：提取末尾的连续数字部分
+     * 解析失败返回null（表示不查询数据库，而不是查询-1的错误数据）
      *
      * @param conversationId 会话ID字符串
-     * @return Long 解析后的会话ID，解析失败返回-1L
+     * @return Long 解析后的会话ID，解析失败返回null
      */
     private Long parseConversationId(String conversationId) {
+        if (conversationId == null || conversationId.isBlank()) {
+            log.warn("会话ID为空");
+            return null;
+        }
         try {
             return Long.parseLong(conversationId);
         } catch (NumberFormatException e) {
+            // 尝试提取前缀后的数字部分（如 "agent_56" → 56）
+            int underscoreIdx = conversationId.lastIndexOf('_');
+            if (underscoreIdx >= 0 && underscoreIdx < conversationId.length() - 1) {
+                String numPart = conversationId.substring(underscoreIdx + 1);
+                try {
+                    return Long.parseLong(numPart);
+                } catch (NumberFormatException e2) {
+                    // 继续尝试其他方式
+                }
+            }
+            // 尝试提取字符串末尾的连续数字
+            StringBuilder numBuilder = new StringBuilder();
+            for (int i = conversationId.length() - 1; i >= 0; i--) {
+                char c = conversationId.charAt(i);
+                if (Character.isDigit(c)) {
+                    numBuilder.insert(0, c);
+                } else if (numBuilder.length() > 0) {
+                    break;
+                }
+            }
+            if (numBuilder.length() > 0) {
+                try {
+                    return Long.parseLong(numBuilder.toString());
+                } catch (NumberFormatException ignored) {
+                }
+            }
             log.warn("会话ID格式错误，无法解析为Long: conversationId={}", conversationId);
-            return -1L;
+            return null;
         }
     }
 

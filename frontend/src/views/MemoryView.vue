@@ -39,6 +39,7 @@ import { memoryChat } from '@/api'
 const messages = ref([])
 const isLoading = ref(false)
 const messagesRef = ref(null)
+const currentConversationId = ref(null)
 let currentSSE = null
 
 const scrollToBottom = () => {
@@ -78,17 +79,17 @@ const handleSendMessage = async (content) => {
   scrollToBottom()
 
   try {
-    const history = messages.value.slice(0, -2).map(m => ({
-      role: m.role,
-      content: m.content
-    }))
-    
-    currentSSE = memoryChat(content, (data) => {
+    const onMessage = (data) => {
       if (data.content) {
         assistantMessage.content += data.content
         scrollToBottom()
       }
-    })
+    }
+    onMessage._conversationIdCallback = (convId) => {
+      currentConversationId.value = convId
+    }
+    
+    currentSSE = memoryChat(content, currentConversationId.value, onMessage)
     await currentSSE
   } catch (error) {
     console.error('Memory chat error:', error)
