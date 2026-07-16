@@ -192,7 +192,36 @@ ollama pull glm4:9b         # 智谱GLM4
 2. 确认使用的是最新前端代码
 3. 检查JWT Token是否正确存储和发送
 
-### Q5: Docker启动后App无法连接数据库
+### Q5: 后端登录正常，但前端登录返回406
+
+**原因：** Vite开发代理错误地把全部`/api`请求的`Accept`头改成`text/event-stream`，导致登录接口无法返回JSON。
+
+**解决方案：**
+1. 确认使用最新的`frontend/vite.config.js`
+2. 仅对请求本身声明`Accept: text/event-stream`的SSE请求设置`Cache-Control: no-cache`
+3. 修改配置后重启Vite开发服务器，并使用`Ctrl + F5`强制刷新页面
+4. 分别验证直连后端和前端代理：两者调用`POST /api/auth/login`都应返回200和`application/json`
+
+### Q6: 聊天请求完成，但助手气泡为空
+
+**原因：** Vue页面持续修改插入响应式数组前保存的普通消息对象，SSE分片到达后没有触发视图更新。
+
+**解决方案：**
+1. 将流式内容写入响应式数组中的消息对象：`messages.value[messages.value.length - 1].content += token`
+2. 正常回复和错误提示必须使用同一种响应式写入方式
+3. 确认Ollama可访问，并检查SSE响应正文长度是否大于0
+4. 修复后执行`npm run build`并强制刷新浏览器
+
+### Q7: 工具演示返回系统内部错误
+
+**原因：** 前端调用了不存在的通用`POST /api/tools/call`路由。
+
+**解决方案：**
+- 天气查询调用`GET /api/tools/weather?city=北京`
+- 计算器调用`GET /api/tools/calculator?expression=2%2B3`
+- 日期时间由前端本地生成
+
+### Q8: Docker启动后App无法连接数据库
 
 **原因：** 数据库未就绪就启动了应用，或健康检查失败。
 

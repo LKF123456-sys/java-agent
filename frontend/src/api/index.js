@@ -229,5 +229,5 @@ export const toggleMcpTool = (name, enabled) => {
 
 // 内置工具API
 export const callBuiltinTool = (toolName, params) => {
-  return request.post('/api/tools/call', { toolName, params })
+  return request.get(`/api/tools/${toolName}`, { params })
 }

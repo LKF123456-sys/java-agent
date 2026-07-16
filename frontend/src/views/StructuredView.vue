@@ -113,13 +113,13 @@ const sendMessage = async () => {
       type: outputType.value
     })
     if (response.code === 200) {
-      aiMessage.content = JSON.stringify(response.data, null, 2)
+      messages.value[messages.value.length - 1].content = JSON.stringify(response.data, null, 2)
     } else {
-      aiMessage.content = '抱歉，结构化提取失败：' + (response.message || '未知错误')
+      messages.value[messages.value.length - 1].content = '抱歉，结构化提取失败：' + (response.message || '未知错误')
     }
     scrollToBottom()
   } catch (error) {
-    aiMessage.content = '抱歉，发生了错误：' + (error.message || '请求失败')
+    messages.value[messages.value.length - 1].content = '抱歉，发生了错误：' + (error.message || '请求失败')
     ElMessage.error('结构化输出请求失败')
   } finally {
     loading.value = false

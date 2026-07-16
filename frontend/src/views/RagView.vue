@@ -224,17 +224,17 @@ const sendMessage = async () => {
         if (data.startsWith('[ERROR]')) {
           hasError = true
           const errorMsg = data.substring(7)
-          aiMessage.content = '抱歉，发生了错误：' + errorMsg
+          messages.value[messages.value.length - 1].content = '抱歉，发生了错误：' + errorMsg
           ElMessage.error(errorMsg)
           return
         }
         fullContent += data
-        aiMessage.content = fullContent
+        messages.value[messages.value.length - 1].content = fullContent
         scrollToBottom()
       },
       onError: (error) => {
         if (!hasError) {
-          aiMessage.content = '抱歉，连接出错了：' + error.message
+          messages.value[messages.value.length - 1].content = '抱歉，连接出错了：' + error.message
           ElMessage.error('RAG问答失败')
         }
       },
@@ -246,7 +246,7 @@ const sendMessage = async () => {
       }
     })
   } catch (error) {
-    aiMessage.content = '抱歉，发生了错误：' + error.message
+    messages.value[messages.value.length - 1].content = '抱歉，发生了错误：' + error.message
     loading.value = false
     ElMessage.error('RAG问答失败')
   }

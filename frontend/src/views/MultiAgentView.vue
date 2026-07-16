@@ -141,7 +141,7 @@ const handleSendMessage = async (content) => {
       addExecutionStep(data.agent, data.step, data.status || 'completed')
     }
     if (data.content) {
-      assistantMessage.content += data.content
+      messages.value[messages.value.length - 1].content += data.content
       scrollToBottom()
     }
   }
@@ -154,7 +154,7 @@ const handleSendMessage = async (content) => {
     await currentSSE
   } catch (error) {
     console.error('Multi agent chat error:', error)
-    assistantMessage.content = '发生错误，请重试'
+    messages.value[messages.value.length - 1].content = '发生错误，请重试'
     ElMessage.error('发送消息失败')
   } finally {
     isLoading.value = false

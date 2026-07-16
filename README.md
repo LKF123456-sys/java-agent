@@ -136,7 +136,7 @@ npm run dev
 | `SPRING_DATASOURCE_USERNAME` | root | 数据库用户名 |
 | `SPRING_DATASOURCE_PASSWORD` | root | 数据库密码 |
 | `JWT_SECRET` | (内置默认值，生产必须修改) | JWT签名密钥 |
-| `TAVILY_API_KEY` | (内置开发Key) | Tavily联网搜索API Key |
+| `TAVILY_API_KEY` | 无 | Tavily联网搜索API Key，请通过环境变量注入，不要提交到仓库 |
 | `OLLAMA_CHAT_MODEL` | qwen2.5:7b | Ollama聊天模型 |
 | `OLLAMA_EMBEDDING_MODEL` | nomic-embed-text | Ollama嵌入模型 |
 | `SPRING_AI_OLLAMA_BASE_URL` | http://localhost:11434 | Ollama服务地址 |
@@ -413,7 +413,7 @@ Swagger UI支持：
 | 系统 | `/api/system` | 健康检查 |
 | 监控 | `/actuator` | 健康检查、指标、MCP端点 |
 
-所有SSE流式接口统一格式：纯文本token流，错误以`[ERROR]`前缀开头。
+所有SSE流式接口使用`text/event-stream`响应。基础聊天、Agent、联网搜索、记忆和RAG以纯文本token流返回，错误以`[ERROR]`前缀开头；多Agent接口返回JSON事件，包含初始化、阶段状态、token和完成事件。开发代理会保留JSON接口的内容协商头，仅对SSE请求关闭缓存。
 
 ---
 

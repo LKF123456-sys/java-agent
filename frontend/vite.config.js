@@ -17,19 +17,20 @@ export default defineConfig({
         changeOrigin: true,
         ws: true,
         configure: (proxy, _options) => {
-          proxy.on('proxyReq', (proxyReq, req, res) => {
-            proxyReq.setHeader('Accept', 'text/event-stream');
-            proxyReq.setHeader('Cache-Control', 'no-cache');
-          });
-          proxy.on('proxyRes', (proxyRes, req, res) => {
-            if (proxyRes.headers['content-type'] && 
-                proxyRes.headers['content-type'].includes('text/event-stream')) {
-              delete proxyRes.headers['content-length'];
-              proxyRes.headers['cache-control'] = 'no-cache, no-transform';
-              proxyRes.headers['x-accel-buffering'] = 'no';
-              proxyRes.headers['connection'] = 'keep-alive';
+          proxy.on('proxyReq', (proxyReq, req) => {
+            if (req.headers.accept?.includes('text/event-stream')) {
+              proxyReq.setHeader('Cache-Control', 'no-cache')
             }
-          });
+          })
+          proxy.on('proxyRes', (proxyRes) => {
+            if (proxyRes.headers['content-type'] &&
+                proxyRes.headers['content-type'].includes('text/event-stream')) {
+              delete proxyRes.headers['content-length']
+              proxyRes.headers['cache-control'] = 'no-cache, no-transform'
+              proxyRes.headers['x-accel-buffering'] = 'no'
+              proxyRes.headers.connection = 'keep-alive'
+            }
+          })
         }
       }
     }

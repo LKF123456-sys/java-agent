@@ -1,19 +1,19 @@
 # Cyber AI Platform - 前端
 
-赛博AI平台的Vue 3前端应用，提供赛博朋克风格的AI交互界面。
+赛博AI平台的Vue 3前端应用，基于Element Plus提供登录认证、SSE流式聊天、多Agent执行过程、RAG知识库和工具演示界面。
 
 ---
 
 ## 技术栈
 
 - **Vue 3** - Composition API + `<script setup>`
-- **Vite 5** - 构建工具
-- **Pinia** - 状态管理
+- **Vite 8** - 基于Rolldown的构建工具
+- **Element Plus** - 企业级UI组件库
+- **Pinia 3** - 状态管理
 - **Vue Router 4** - 前端路由
-- **Axios** - HTTP客户端
-- **marked** - Markdown渲染
-- **highlight.js** - 代码语法高亮
-- **赛博朋克主题** - 自研霓虹风格CSS设计系统
+- **Axios 1** - HTTP客户端与Token拦截器
+- **Fetch Streams** - 携带JWT的SSE流式响应
+- **marked + highlight.js + DOMPurify** - Markdown渲染、代码高亮和XSS防护
 
 ---
 
@@ -59,11 +59,9 @@ frontend/
 ├── src/
 │   ├── App.vue           # 根组件
 │   ├── main.js           # 应用入口
-│   ├── assets/           # 资源文件
-│   │   └── styles/
-│   │       └── cyber-theme.css  # 赛博朋克主题样式
+│   ├── assets/           # 资源文件与全局样式
 │   ├── components/       # 公共组件
-│   │   ├── CyberLayout.vue      # 全局布局（导航栏/侧边栏/登出）
+│   │   ├── CyberLayout.vue      # Element Plus全局布局（导航栏/侧边栏/登出）
 │   │   ├── ChatMessage.vue      # 聊天消息（Markdown+代码高亮+复制）
 │   │   ├── ChatInput.vue        # 消息输入框（自适应高度/Enter发送）
 │   │   └── LoginModal.vue       # 登录/注册弹窗
@@ -117,6 +115,14 @@ const connection = createSSEConnection('/api/chat/stream?message=你好', {
 connection.close()
 ```
 
+流式消息必须更新响应式数组中的消息对象，例如：
+
+```javascript
+messages.value[messages.value.length - 1].content += token
+```
+
+不要持续修改插入数组前保存的普通对象引用，否则Vue不会触发视图更新，页面会出现空白助手气泡。
+
 ### 认证机制
 
 - JWT Token存储在localStorage
@@ -136,19 +142,12 @@ ChatMessage组件使用marked + highlight.js：
 
 ---
 
-## 主题颜色
+## UI与消息渲染
 
-赛博朋克主题CSS变量定义在 `assets/styles/cyber-theme.css`：
-
-| 变量 | 值 | 说明 |
-|------|-----|------|
-| `--cyber-cyan` | `#00ffff` | 主色调（霓虹青） |
-| `--cyber-magenta` | `#ff00ff` | 强调色（霓虹洋红） |
-| `--cyber-bg-primary` | `#0a0a0f` | 主背景色 |
-| `--cyber-bg-secondary` | `#12121a` | 次级背景 |
-| `--cyber-border` | `#1a1a2e` | 边框色 |
-| `--cyber-text` | `#e0e0e0` | 主文本色 |
-| `--cyber-text-muted` | `#888` | 次要文本 |
+- 页面布局、表单、菜单、卡片和反馈提示统一使用Element Plus
+- `ChatMessage`负责Markdown渲染、代码高亮、复制和内容净化
+- Agent、联网搜索、多Agent、记忆对话、RAG及结构化输出统一将异步结果写入响应式消息数组
+- 登录、注册和Token刷新使用JSON内容协商，SSE聊天使用`text/event-stream`
 
 ---
 
@@ -160,9 +159,16 @@ ChatMessage组件使用marked + highlight.js：
 proxy: {
   '/api': {
     target: 'http://localhost:8080',
-    changeOrigin: true
+    changeOrigin: true,
+    configure: (proxy) => {
+      proxy.on('proxyReq', (proxyReq, req) => {
+        if (req.headers.accept?.includes('text/event-stream')) {
+          proxyReq.setHeader('Cache-Control', 'no-cache')
+        }
+      })
+    }
   }
 }
 ```
 
-所有以 `/api` 开头的请求自动代理到后端8080端口，无需配置CORS。
+所有以 `/api` 开头的请求自动代理到后端8080端口，无需配置CORS。代理不得把所有请求的`Accept`强制改为`text/event-stream`，否则登录、注册等JSON接口会因内容协商失败返回406。

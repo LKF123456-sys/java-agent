@@ -144,8 +144,18 @@ const executeTool = async () => {
       params = { format: toolParams.value.format }
     }
     
-    const res = await callBuiltinTool(selectedTool.value, params)
-    result.value = JSON.stringify(res.data, null, 2)
+    if (selectedTool.value === 'datetime') {
+      const now = new Date()
+      const values = {
+        standard: now.toLocaleString('zh-CN'),
+        timestamp: now.getTime(),
+        relative: '刚刚'
+      }
+      result.value = JSON.stringify({ result: values[params.format] }, null, 2)
+    } else {
+      const res = await callBuiltinTool(selectedTool.value, params)
+      result.value = JSON.stringify(res.data, null, 2)
+    }
     ElMessage.success('工具执行成功')
   } catch (error) {
     result.value = '执行失败：' + error.message
