@@ -1,7 +1,7 @@
-package com.ailearn.common;
+package com.ailearn.common; // 声明包名，属于通用模块
 
-import lombok.AllArgsConstructor;
-import lombok.Getter;
+import lombok.AllArgsConstructor; // 导入Lombok的@AllArgsConstructor注解，自动生成全参构造器
+import lombok.Getter; // 导入Lombok的@Getter注解，自动生成getter方法
 
 /**
  * 业务错误码枚举类
@@ -16,9 +16,9 @@ import lombok.Getter;
  *
  * @author AiLearn Platform
  */
-@Getter
-@AllArgsConstructor
-public enum ErrorCode {
+@Getter // Lombok注解，自动生成getCode()和getMessage()方法
+@AllArgsConstructor // Lombok注解，自动生成包含所有字段的构造器
+public enum ErrorCode { // 枚举类定义，每个枚举值包含错误码和错误消息两个属性
 
     // ==================== 1xxx: 认证授权相关错误 (AUTH) ====================
     /**
@@ -344,11 +344,13 @@ public enum ErrorCode {
 
     /**
      * 错误码
+     * 用于API响应中标识具体的错误类型，前端可根据此码做差异化处理
      */
-    private final int code;
+    private final int code; // 错误码字段，final确保不可变，由@AllArgsConstructor生成构造器赋值
 
     /**
      * 错误消息
+     * 人类可读的错误描述信息，用于API响应中的message字段
      */
-    private final String message;
-}
+    private final String message; // 错误消息字段，final确保不可变
+} // ErrorCode枚举类结束
