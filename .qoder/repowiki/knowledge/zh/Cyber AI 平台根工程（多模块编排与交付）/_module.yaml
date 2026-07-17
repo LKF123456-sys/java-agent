@@ -1,0 +1,14 @@
+schema_version: 1
+module_path: ""
+title: Cyber AI 平台根工程（多模块编排与交付）
+scope:
+    - .gitignore
+    - .dockerignore
+    - Dockerfile
+    - pom.xml
+    - javaAILearn.iml
+    - docker-compose.yml
+    - README.md
+source_files: []
+depends_on: []
+related_to: []

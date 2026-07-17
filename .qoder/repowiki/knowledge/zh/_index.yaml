@@ -1,0 +1,63 @@
+# 知识卡导出索引文件
+schema_version: 1
+locale: zh-CN
+branch: master
+nodes_managed: true
+exported_at: "2026-07-17T16:26:06Z"
+modules:
+    "":
+        dir_name: Cyber AI 平台根工程（多模块编排与交付）
+        title: Cyber AI 平台根工程（多模块编排与交付）
+        scope:
+            - .gitignore
+            - .dockerignore
+            - Dockerfile
+            - pom.xml
+            - javaAILearn.iml
+            - docker-compose.yml
+            - README.md
+        source_files: []
+        children:
+            - backend_service
+            - docs
+            - frontend_app
+            - infra_and_deploy
+        depends_on: []
+        related_to: []
+    backend_service:
+        dir_name: Cyber AI 平台后端服务（Spring Boot + Spring AI）
+        title: Cyber AI 平台后端服务（Spring Boot + Spring AI）
+        scope:
+            - src/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    docs:
+        dir_name: 项目文档与超级智能体规划
+        title: 项目文档与超级智能体规划
+        scope:
+            - docs/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    frontend_app:
+        dir_name: Cyber AI 前端控制台（Vue3 + Element Plus）
+        title: Cyber AI 前端控制台（Vue3 + Element Plus）
+        scope:
+            - frontend/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    infra_and_deploy:
+        dir_name: 容器镜像与 CI_CD 流水线
+        title: 容器镜像与 CI/CD 流水线
+        scope:
+            - docker/
+            - .github/workflows/ci-cd.yml
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
