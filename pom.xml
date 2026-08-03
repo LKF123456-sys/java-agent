@@ -4,32 +4,50 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <!-- ==================== 父POM：Spring Boot 3.4.7（最新稳定版） ==================== -->
+    <!-- ==================== 父POM：Spring Boot 4.1.0 ==================== -->
+    <!-- 升级说明：Spring AI 2.0 GA 把 Spring Boot 4 作为硬依赖，无法在 Boot 3.x 上运行 -->
+    <!-- 版本选择依据：Spring AI 2.0.0 官方构件（spring-ai-starter-model-ollama-2.0.0.pom） -->
+    <!-- 直接引用 spring-boot 4.1.0 依赖，因此 4.1.0 是官方验证过的最佳搭配 -->
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.4.13</version>
+        <version>4.1.0</version>
         <relativePath/>
     </parent>
 
     <!-- ==================== 项目坐标 ==================== -->
     <groupId>com.ailearn</groupId>
     <artifactId>javaAILearn</artifactId>
-    <version>0.0.3-SNAPSHOT</version>
+    <version>0.1.0-SNAPSHOT</version>
     <name>Cyber AI Platform</name>
-    <description>赛博AI平台 - 生产级Spring AI企业级应用，支持多Agent协作、MCP协议、RAG知识库、JWT认证、PgVector向量存储</description>
+    <description>赛博AI平台 - 基于Spring Boot 4 + Spring AI 2.0的企业级AI应用，支持多Agent协作、MCP协议、RAG知识库、JWT认证、PgVector向量存储</description>
 
     <!-- ==================== 版本属性管理 ==================== -->
     <properties>
+        <!-- JDK 保持 21：Boot 4 最低要求 17，21 是当前主流 LTS，无需变动 -->
         <java.version>21</java.version>
-        <spring-ai.version>1.1.8</spring-ai.version>
-        <jjwt.version>0.12.7</jjwt.version>
-        <springdoc.version>2.8.17</springdoc.version>
-        <resilience4j.version>2.3.0</resilience4j.version>
+        <!-- Spring AI 2.0.0 GA（2026-06-12 发布） -->
+        <spring-ai.version>2.0.0</spring-ai.version>
+        <!-- JJWT 0.13.0：jjwt-jackson 模块已适配 Jackson 3（tools.jackson），API 与 0.12 完全兼容 -->
+        <jjwt.version>0.13.0</jjwt.version>
+        <!-- springdoc 3.1.0：官方对应 Spring Boot 4.1.0 的版本（Boot 4 支持自 3.0.0 起） -->
+        <!-- 注意：2.x 系列依赖 Jackson 2，在 Boot 4 下会报 ClassNotFoundException，必须升级 -->
+        <springdoc.version>3.1.0</springdoc.version>
+        <!-- Resilience4j 2.4.0：官方已发布 Spring Boot 4 专用 starter（resilience4j-spring-boot4） -->
+        <resilience4j.version>2.4.0</resilience4j.version>
+        <!-- MyBatis-Plus 3.5.17：官方发布的 Spring Boot 4 专用 starter 系列 -->
+        <mybatis-plus.version>3.5.17</mybatis-plus.version>
+        <!-- Tess4J OCR：与 Spring 无耦合，版本不变 -->
         <tess4j.version>5.19.0</tess4j.version>
+        <!-- Hutool 工具库：与 Spring/Jackson 无耦合，版本不变 -->
         <hutool.version>5.8.46</hutool.version>
-        <logstash-logback-encoder.version>8.1</logstash-logback-encoder.version>
-        <micrometer-tracing.version>1.4.3</micrometer-tracing.version>
+        <!-- logstash-logback-encoder 9.0：该版本起迁移到 Jackson 3，与 Boot 4 技术栈一致 -->
+        <logstash-logback-encoder.version>9.0</logstash-logback-encoder.version>
+        <!-- 注意：原 micrometer-tracing.version=1.4.3 已删除，由 Boot 4 BOM 统一管理 -->
+        <!-- spring-retry：Boot 4 BOM 不再管理该库版本，需显式指定（2.0.13 为当前最新） -->
+        <spring-retry.version>2.0.13</spring-retry.version>
+        <!-- Testcontainers：Boot 4 改为通过官方 BOM 管理，版本在此统一定义 -->
+        <testcontainers.version>2.0.5</testcontainers.version>
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -45,6 +63,14 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
+            <!-- Testcontainers BOM：Boot 4 不再内置其版本管理，需显式导入官方 BOM -->
+            <dependency>
+                <groupId>org.testcontainers</groupId>
+                <artifactId>testcontainers-bom</artifactId>
+                <version>${testcontainers.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 
@@ -52,46 +78,44 @@
     <dependencies>
 
         <!-- ========== Spring Boot Web核心 ========== -->
-        <!-- Spring MVC Web支持，提供REST API能力 -->
+        <!-- 破坏性变更：Boot 4 模块化拆分，spring-boot-starter-web 更名为 spring-boot-starter-webmvc -->
+        <!-- 作用不变：Spring MVC + 内嵌 Tomcat，提供 REST API 能力 -->
          <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-web</artifactId>
+            <artifactId>spring-boot-starter-webmvc</artifactId>
         </dependency>
 
-        
-
-        <!-- Spring Retry：重试支持（Spring AI 2.0必需） -->
+        <!-- Spring Retry：Spring AI 内部重试机制需要 -->
+        <!-- 变更：Boot 4 BOM 不再管理 spring-retry 版本，显式指定 2.0.13（与 Framework 7 兼容） -->
         <dependency>
             <groupId>org.springframework.retry</groupId>
             <artifactId>spring-retry</artifactId>
-            <version>2.0.4</version>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework</groupId>
-            <artifactId>spring-aop</artifactId>
-            <version>6.2.8</version>
+            <version>${spring-retry.version}</version>
         </dependency>
 
-        <!-- WebFlux响应式支持，SSE流式响应和Reactor类型依赖 -->
+        <!-- 变更说明：原显式引入的 spring-aop 6.2.8 已删除 -->
+        <!-- 原因：Boot 4 自带 Spring Framework 7 的 spring-aop 7.x，显式引入 6.2.8 会造成版本冲突 -->
+
+        <!-- WebFlux响应式支持，SSE流式响应和Reactor类型依赖（starter 名称在 Boot 4 中未变） -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webflux</artifactId>
         </dependency>
 
         <!-- ========== 安全认证 ========== -->
-        <!-- Spring Security安全框架，提供认证授权基础能力 -->
+        <!-- Spring Security 7（跟随 Boot 4），starter 名称未变，lambda DSL 配置方式继续兼容 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
 
-        <!-- JSR380参数校验（@Valid/@NotNull等注解） -->
+        <!-- JSR380参数校验（@Valid/@NotNull等注解），starter 名称未变 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
 
-        <!-- JJWT：JWT令牌生成与验证 -->
+        <!-- JJWT：JWT令牌生成与验证，升级到 0.13.0（适配 Jackson 3，API 不变） -->
         <dependency>
             <groupId>io.jsonwebtoken</groupId>
             <artifactId>jjwt-api</artifactId>
@@ -110,8 +134,8 @@
             <scope>runtime</scope>
         </dependency>
 
-        <!-- ========== Spring AI核心依赖 ========== -->
-        <!-- Ollama本地模型接入（聊天+嵌入） -->
+        <!-- ========== Spring AI核心依赖（版本由 spring-ai-bom 统一管理） ========== -->
+        <!-- Ollama本地模型接入（聊天+嵌入），starter 坐标在 2.0 中未变 -->
         <dependency>
             <groupId>org.springframework.ai</groupId>
             <artifactId>spring-ai-starter-model-ollama</artifactId>
@@ -123,13 +147,13 @@
             <artifactId>spring-ai-vector-store</artifactId>
         </dependency>
 
-        <!-- PgVector：PostgreSQL向量扩展存储 -->
+        <!-- PgVector：PostgreSQL向量扩展存储，Spring AI 2.0 对其无破坏性变更 -->
         <dependency>
             <groupId>org.springframework.ai</groupId>
             <artifactId>spring-ai-starter-vector-store-pgvector</artifactId>
         </dependency>
 
-        <!-- PDF文档读取器（基于Apache PDFBox） -->
+        <!-- PDF文档读取器（基于Apache PDFBox），RAG 文档解析用 -->
         <dependency>
             <groupId>org.springframework.ai</groupId>
             <artifactId>spring-ai-pdf-document-reader</artifactId>
@@ -142,25 +166,26 @@
         </dependency>
 
         <!-- ========== 数据库与ORM ========== -->
-        <!-- MySQL驱动 -->
+        <!-- MySQL驱动，版本由 Boot 4 BOM 管理 -->
         <dependency>
             <groupId>com.mysql</groupId>
             <artifactId>mysql-connector-j</artifactId>
             <scope>runtime</scope>
         </dependency>
 
-        <!-- PostgreSQL驱动（PgVector需要） -->
+        <!-- PostgreSQL驱动（PgVector需要），版本由 Boot 4 BOM 管理 -->
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
             <scope>runtime</scope>
         </dependency>
 
-        <!-- MyBatis-Plus：增强版MyBatis ORM框架（Spring Boot 3适配版） -->
+        <!-- 破坏性变更：MyBatis-Plus 更换为 Spring Boot 4 专用 starter -->
+        <!-- 原因：Boot 4 基于 Spring Framework 7，旧 boot3-starter 会触发 factoryBeanObjectType 类型错误 -->
         <dependency>
             <groupId>com.baomidou</groupId>
-            <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
-            <version>3.5.15</version>
+            <artifactId>mybatis-plus-spring-boot4-starter</artifactId>
+            <version>${mybatis-plus.version}</version>
         </dependency>
 
         <!-- MyBatis-Plus JSqlParser扩展：提供分页插件PaginationInnerInterceptor等JSqlParser依赖的拦截器
@@ -168,29 +193,32 @@
         <dependency>
             <groupId>com.baomidou</groupId>
             <artifactId>mybatis-plus-jsqlparser</artifactId>
-            <version>3.5.15</version>
+            <version>${mybatis-plus.version}</version>
         </dependency>
 
         <!-- ========== 监控与运维 ========== -->
-        <!-- Spring Boot Actuator：应用健康检查与指标端点 -->
+        <!-- Spring Boot Actuator：应用健康检查与指标端点，starter 名称未变 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
 
         <!-- Micrometer Tracing + Brave：分布式链路追踪 -->
+        <!-- 变更：删除原显式版本 1.4.3，由 Boot 4 BOM 统一管理匹配的版本 -->
         <dependency>
             <groupId>io.micrometer</groupId>
             <artifactId>micrometer-tracing-bridge-brave</artifactId>
         </dependency>
 
-        <!-- Spring Boot AOP：用于MDC链路追踪切面 -->
+        <!-- 破坏性变更：spring-boot-starter-aop 在 Boot 4 中更名为 spring-boot-starter-aspectj -->
+        <!-- 作用不变：AOP 切面支持（MDC 链路追踪切面、Resilience4j 注解切面都依赖它） -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-aop</artifactId>
+            <artifactId>spring-boot-starter-aspectj</artifactId>
         </dependency>
 
         <!-- Logstash Logback Encoder：输出JSON格式日志供ELK/Loki采集 -->
+        <!-- 升级到 9.0：该版本起内部 JSON 处理迁移到 Jackson 3，与 Boot 4 一致 -->
         <dependency>
             <groupId>net.logstash.logback</groupId>
             <artifactId>logstash-logback-encoder</artifactId>
@@ -198,7 +226,8 @@
         </dependency>
 
         <!-- ========== API文档 ========== -->
-        <!-- springdoc-openapi：自动生成OpenAPI 3.0/Swagger文档 -->
+        <!-- springdoc-openapi 3.1.0：官方对应 Spring Boot 4.1.0 的版本（Boot 4 支持自 3.0.0 起） -->
+        <!-- 2.x 系列依赖 Jackson 2，在 Boot 4 下启动即崩溃，必须升级 -->
         <dependency>
             <groupId>org.springdoc</groupId>
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
@@ -207,9 +236,10 @@
 
         <!-- ========== 熔断限流（Resilience4j） ========== -->
         <!-- Resilience4j核心：限流、熔断、重试 -->
+        <!-- 变更：升级为官方 Spring Boot 4 专用 starter（boot3 starter 在 Boot 4 下会被兼容性检查直接拒绝启动） -->
         <dependency>
             <groupId>io.github.resilience4j</groupId>
-            <artifactId>resilience4j-spring-boot3</artifactId>
+            <artifactId>resilience4j-spring-boot4</artifactId>
             <version>${resilience4j.version}</version>
         </dependency>
         <dependency>
@@ -219,7 +249,7 @@
         </dependency>
 
         <!-- ========== OCR支持 ========== -->
-        <!-- Tess4J：Tesseract OCR的Java封装，支持扫描件图片文字识别 -->
+        <!-- Tess4J：Tesseract OCR的Java封装，支持扫描件图片文字识别，与 Spring 无耦合 -->
         <dependency>
             <groupId>net.sourceforge.tess4j</groupId>
             <artifactId>tess4j</artifactId>
@@ -235,7 +265,7 @@
             <optional>true</optional>
         </dependency>
 
-        <!-- Hutool：Java工具类库，提供丰富的常用工具方法 -->
+        <!-- Hutool：Java工具类库，提供丰富的常用工具方法，与 Spring 无耦合 -->
         <dependency>
             <groupId>cn.hutool</groupId>
             <artifactId>hutool-all</artifactId>
@@ -265,6 +295,7 @@
             <scope>test</scope>
         </dependency>
         <!-- Testcontainers：集成测试容器化数据库 -->
+        <!-- 变更：Testcontainers 2.x 构件名统一加了 testcontainers- 前缀（junit-jupiter → testcontainers-junit-jupiter） -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-testcontainers</artifactId>
@@ -272,12 +303,12 @@
         </dependency>
         <dependency>
             <groupId>org.testcontainers</groupId>
-            <artifactId>junit-jupiter</artifactId>
+            <artifactId>testcontainers-junit-jupiter</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.testcontainers</groupId>
-            <artifactId>mysql</artifactId>
+            <artifactId>testcontainers-mysql</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>
@@ -302,7 +333,8 @@
                         <path>
                             <groupId>org.projectlombok</groupId>
                             <artifactId>lombok</artifactId>
-                            <version>1.18.36</version>
+                            <!-- Lombok 升到 1.18.46，确保与 Boot 4 / JDK 21 编译器兼容 -->
+                            <version>1.18.46</version>
                         </path>
                     </annotationProcessorPaths>
                 </configuration>

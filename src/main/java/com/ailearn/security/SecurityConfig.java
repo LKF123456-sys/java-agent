@@ -2,7 +2,7 @@ package com.ailearn.security; // 声明包名，属于安全认证模块
 
 import com.ailearn.common.ErrorCode; // 导入错误码枚举，用于返回标准化错误码
 import com.ailearn.common.Result; // 导入统一响应包装类，用于构建JSON错误响应
-import com.fasterxml.jackson.databind.ObjectMapper; // 导入Jackson对象映射器，将Result对象序列化为JSON
+import tools.jackson.databind.ObjectMapper; // 导入Jackson对象映射器（Jackson 3：包名 com.fasterxml.jackson → tools.jackson），将Result对象序列化为JSON
 import jakarta.servlet.http.HttpServletResponse; // 导入HTTP响应对象，用于设置状态码和写入响应体
 import lombok.RequiredArgsConstructor; // 导入Lombok注解，为final字段自动生成构造器注入
 import org.springframework.context.annotation.Bean; // 导入Bean注解，将方法返回值注册为Spring容器管理的Bean

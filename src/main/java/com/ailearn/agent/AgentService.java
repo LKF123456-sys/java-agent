@@ -90,8 +90,6 @@ public class AgentService {
                         ToolCallbackProvider toolCallbackProvider) {
         // 保存会话服务引用
         this.conversationService = conversationService;
-        // 获取所有已注册的工具回调列表
-        var callbacks = toolCallbackProvider.getToolCallbacks();
         // 构建Agent客户端，配置系统提示词、记忆顾问和工具
         this.agentClient = ChatClient.builder(chatModel)
                 // 设置Agent的系统提示词，定义其角色和能力
@@ -108,12 +106,16 @@ public class AgentService {
                         思考步骤：分析问题 → 判断是否需要工具 → 调用工具 → 综合回答
                         """)
                 // 注册消息记忆顾问，自动将历史对话注入上下文
+                // Spring AI 2.0 变化：记忆Advisor默认位于工具循环外侧，只保存最终一问一答，
+                // 不再向DatabaseChatMemory写入工具调用中间消息，行为更符合本项目的存储模型
                 .defaultAdvisors(MessageChatMemoryAdvisor.builder(chatMemory).build())
-                // 注册所有工具回调，使Agent可以自主调用工具
-                .defaultToolCallbacks(callbacks)
+                // Spring AI 2.0 迁移：defaultToolCallbacks(数组) 已废弃，
+                // 改用 defaultTools() 直接接收 ToolCallbackProvider（也支持ToolCallback、@Tool注解对象）
+                // 注意：2.0 检测到工具后会自动注册 ToolCallingAdvisor，切勿手动重复注册
+                .defaultTools(toolCallbackProvider)
                 .build();
-        // 打印初始化日志，记录可用工具数量
-        log.info("AgentService初始化完成，已注册工具: {}", callbacks.length);
+        // 打印初始化日志
+        log.info("AgentService初始化完成（Spring AI 2.0），工具由ToolCallbackProvider提供");
     }
 
     /**

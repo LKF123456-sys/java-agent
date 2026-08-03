@@ -1,6 +1,6 @@
 package com.ailearn.common; // 声明包名
 
-import com.fasterxml.jackson.databind.ObjectMapper; // Jackson JSON序列化/反序列化类
+import tools.jackson.databind.ObjectMapper; // Jackson JSON序列化/反序列化类（Jackson 3 新包名 tools.jackson）
 import org.junit.jupiter.api.BeforeEach; // JUnit前置方法注解
 import org.junit.jupiter.api.DisplayName; // JUnit显示名称注解
 import org.junit.jupiter.api.Test; // JUnit测试方法注解

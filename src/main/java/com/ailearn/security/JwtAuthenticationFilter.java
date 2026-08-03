@@ -2,7 +2,7 @@ package com.ailearn.security;
 
 import com.ailearn.common.ErrorCode;
 import com.ailearn.common.Result;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper; // Jackson 3：包名由 com.fasterxml.jackson 迁移至 tools.jackson
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.DispatcherType;
 import jakarta.servlet.FilterChain;

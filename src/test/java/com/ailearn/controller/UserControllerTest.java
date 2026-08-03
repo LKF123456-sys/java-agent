@@ -7,7 +7,7 @@ import com.ailearn.dto.LoginRequest; // 登录请求DTO
 import com.ailearn.dto.RegisterRequest; // 注册请求DTO
 import com.ailearn.security.UserPrincipal; // 用户主体类
 import com.ailearn.service.UserService; // 用户服务
-import com.fasterxml.jackson.databind.ObjectMapper; // Jackson JSON序列化类
+import tools.jackson.databind.ObjectMapper; // Jackson JSON序列化类（Jackson 3 新包名 tools.jackson）
 import org.junit.jupiter.api.BeforeEach; // JUnit前置方法注解
 import org.junit.jupiter.api.DisplayName; // JUnit显示名称注解
 import org.junit.jupiter.api.Test; // JUnit测试方法注解

@@ -16,12 +16,13 @@ import com.ailearn.memory.DatabaseChatMemory;
 import com.ailearn.security.UserPrincipal;
 // 导入会话服务，管理会话的创建、查询和消息保存
 import com.ailearn.service.ConversationService;
-// 导入Jackson JSON序列化异常类
-import com.fasterxml.jackson.core.JsonProcessingException;
-// 导入Jackson泛型类型引用，用于反序列化JSON为Map等泛型类型
-import com.fasterxml.jackson.core.type.TypeReference;
-// 导入Jackson对象映射器，用于JSON序列化和反序列化
-import com.fasterxml.jackson.databind.ObjectMapper;
+// 导入Jackson数据绑定异常类（Jackson 3：JsonProcessingException已移除，
+// 序列化异常统一抛出非受检的DatabindException，包名为tools.jackson.databind）
+import tools.jackson.databind.DatabindException;
+// 导入Jackson泛型类型引用，用于反序列化JSON为Map等泛型类型（Jackson 3 新包名）
+import tools.jackson.core.type.TypeReference;
+// 导入Jackson对象映射器，用于JSON序列化和反序列化（Jackson 3 新包名，API不变）
+import tools.jackson.databind.ObjectMapper;
 // 导入Resilience4j限流器注解，用于API限流保护
 import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
 // 导入Lombok日志注解，自动生成log对象
@@ -229,10 +230,8 @@ public class MultiAgentService {
         this.conversationService = conversationService;
         // 保存工具提供者引用
         this.toolCallbackProvider = toolCallbackProvider;
-        // 获取所有已注册的工具回调列表，用于日志输出
-        var callbacks = toolCallbackProvider.getToolCallbacks();
-        // 打印初始化完成日志，记录可用工具数量
-        log.info("MultiAgentService初始化完成，工具数量: {}", callbacks.length);
+        // 打印初始化完成日志
+        log.info("MultiAgentService初始化完成（Spring AI 2.0），工具由ToolCallbackProvider提供");
     }
 
     /**
@@ -249,10 +248,14 @@ public class MultiAgentService {
                 // 设置Agent的系统提示词，定义其角色行为
                 .defaultSystem(systemPrompt)
                 // 注册消息记忆顾问，自动将历史对话注入上下文
+                // Spring AI 2.0：记忆Advisor默认位于工具循环外侧，只保存最终一问一答
                 .defaultAdvisors(MessageChatMemoryAdvisor.builder(chatMemory).build());
-        // 如果该Agent需要工具调用能力，则注册所有工具回调
+        // 如果该Agent需要工具调用能力，则注册工具提供者
         if (withTools) {
-            builder.defaultToolCallbacks(toolCallbackProvider.getToolCallbacks());
+            // Spring AI 2.0 迁移：defaultToolCallbacks(数组) 已废弃，
+            // 改用 defaultTools() 直接接收 ToolCallbackProvider
+            // 2.0 检测到工具后自动注册 ToolCallingAdvisor，无需手动添加
+            builder.defaultTools(toolCallbackProvider);
         }
         // 构建并返回ChatClient实例
         return builder.build();
@@ -281,7 +284,7 @@ public class MultiAgentService {
             event.put("content", content != null ? content : "");
             // 序列化为JSON字符串并返回
             return objectMapper.writeValueAsString(event);
-        } catch (JsonProcessingException e) {
+        } catch (DatabindException e) { // Jackson 3：序列化异常为非受检异常DatabindException（原JsonProcessingException已移除）
             // 序列化异常时记录错误日志，返回兜底错误JSON
             log.error("SSE事件序列化失败", e);
             return "{\"type\":\"error\",\"content\":\"事件序列化失败\"}";

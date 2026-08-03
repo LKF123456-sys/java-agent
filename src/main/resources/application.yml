@@ -67,8 +67,9 @@ spring:
           num-ctx: 8192
       embedding:
         enabled: true
-        options:
-          model: ${OLLAMA_EMBEDDING_MODEL:nomic-embed-text}
+        # Spring AI 2.0 破坏性变更：嵌入模型属性扁平化，删除了中间的 .options 段
+        # 旧写法 spring.ai.ollama.embedding.options.model 已废弃（仅作过渡兼容）
+        model: ${OLLAMA_EMBEDDING_MODEL:nomic-embed-text}
       base-url: ${SPRING_AI_OLLAMA_BASE_URL:http://localhost:11434}
 
     # MCP服务器配置（Model Context Protocol）
@@ -291,8 +292,8 @@ spring:
           num-ctx: 8192
       embedding:
         enabled: true
-        options:
-          model: ${SPRING_AI_OLLAMA_EMBEDDING_OPTIONS_MODEL:nomic-embed-text}
+        # Spring AI 2.0：属性扁平化（.options 段已删除），环境变量同步改为 SPRING_AI_OLLAMA_EMBEDDING_MODEL
+        model: ${SPRING_AI_OLLAMA_EMBEDDING_MODEL:nomic-embed-text}
 
     # ==================== PgVector向量存储配置（启用） ====================
     vectorstore:

@@ -10,7 +10,7 @@ import org.springframework.ai.vectorstore.pgvector.autoconfigure.PgVectorStoreAu
 
 /**
  * 赛博AI平台（Cyber AI Platform）启动类
- * 基于Spring Boot 3.4.7和Spring AI 1.0.0构建的生产级AI应用平台
+ * 基于Spring Boot 4.1.0和Spring AI 2.0.0构建的生产级AI应用平台
  *
  * <p>平台核心功能模块：
  * <ul>
@@ -26,16 +26,16 @@ import org.springframework.ai.vectorstore.pgvector.autoconfigure.PgVectorStoreAu
  *
  * <p>技术栈：
  * <ul>
- *   <li>Spring Boot 3.4.7 + Spring Security + Spring Validation</li>
- *   <li>Spring AI 1.0.0 + Ollama本地模型</li>
- *   <li>MyBatis-Plus 3.5.9 + MySQL/PostgreSQL(PgVector)</li>
- *   <li>Springdoc OpenAPI 2.8.6（Swagger文档）</li>
- *   <li>Resilience4j（限流熔断）</li>
- *   <li>JJWT 0.12.6（JWT令牌）</li>
+ *   <li>Spring Boot 4.1.0 + Spring Security 7 + Spring Validation</li>
+ *   <li>Spring AI 2.0.0 + Ollama本地模型</li>
+ *   <li>MyBatis-Plus 3.5.17 + MySQL/PostgreSQL(PgVector)</li>
+ *   <li>Springdoc OpenAPI 3.1.0（Swagger文档）</li>
+ *   <li>Resilience4j 2.4.0（限流熔断）</li>
+ *   <li>JJWT 0.13.0（JWT令牌，适配Jackson 3）</li>
  * </ul>
  *
  * @author AiLearn Platform
- * @version 0.0.3-SNAPSHOT
+ * @version 0.1.0-SNAPSHOT
  */
 @SpringBootApplication(exclude = {PgVectorStoreAutoConfiguration.class}) // 标记这是一个Spring Boot应用类，启用自动配置和组件扫描，排除PgVectorStore自动配置避免Bean冲突
 @MapperScan("com.ailearn.mapper") // MyBatis注解，扫描com.ailearn.mapper包下的所有Mapper接口
