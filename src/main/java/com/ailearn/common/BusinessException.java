@@ -1,6 +1,6 @@
-package com.ailearn.common;
+package com.ailearn.common; // 声明包名，common包存放通用基础类
 
-import lombok.Getter;
+import lombok.Getter; // Lombok注解，自动生成所有getter方法
 
 /**
  * 业务异常类
@@ -9,22 +9,22 @@ import lombok.Getter;
  *
  * @author AiLearn Platform
  */
-@Getter
-public class BusinessException extends RuntimeException {
+@Getter // Lombok注解，自动为errorCode和detail字段生成getter
+public class BusinessException extends RuntimeException { // 继承运行时异常（非受检，无需在方法签名声明）
 
-    private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 1L; // 序列化版本号（Serializable规范要求）
 
     /**
      * 错误码枚举
      * 包含错误码和默认错误消息
      */
-    private final ErrorCode errorCode;
+    private final ErrorCode errorCode; // 错误码枚举，标识异常类型
 
     /**
      * 详细错误信息
      * 可选字段，用于补充错误的具体上下文信息
      */
-    private final String detail;
+    private final String detail; // 详细错误描述，可选
 
     /**
      * 构造方法（仅错误码）
@@ -32,8 +32,8 @@ public class BusinessException extends RuntimeException {
      *
      * @param errorCode 错误码枚举
      */
-    public BusinessException(ErrorCode errorCode) {
-        this(errorCode, null, null);
+    public BusinessException(ErrorCode errorCode) { // 单参数构造
+        this(errorCode, null, null); // 委托给全参构造
     }
 
     /**
@@ -43,8 +43,8 @@ public class BusinessException extends RuntimeException {
      * @param errorCode 错误码枚举
      * @param detail    详细错误信息
      */
-    public BusinessException(ErrorCode errorCode, String detail) {
-        this(errorCode, detail, null);
+    public BusinessException(ErrorCode errorCode, String detail) { // 错误码+详情构造
+        this(errorCode, detail, null); // 委托给全参构造
     }
 
     /**
@@ -54,8 +54,8 @@ public class BusinessException extends RuntimeException {
      * @param errorCode 错误码枚举
      * @param cause     原始异常原因
      */
-    public BusinessException(ErrorCode errorCode, Throwable cause) {
-        this(errorCode, null, cause);
+    public BusinessException(ErrorCode errorCode, Throwable cause) { // 错误码+原因构造
+        this(errorCode, null, cause); // 委托给全参构造
     }
 
     /**
@@ -66,10 +66,10 @@ public class BusinessException extends RuntimeException {
      * @param detail    详细错误信息
      * @param cause     原始异常原因
      */
-    public BusinessException(ErrorCode errorCode, String detail, Throwable cause) {
-        super(buildMessage(errorCode, detail), cause);
-        this.errorCode = errorCode;
-        this.detail = detail;
+    public BusinessException(ErrorCode errorCode, String detail, Throwable cause) { // 全参构造
+        super(buildMessage(errorCode, detail), cause); // 调用父类构造，传入拼接后的消息和原始原因
+        this.errorCode = errorCode; // 赋值错误码
+        this.detail = detail; // 赋值详情
     }
 
     /**
@@ -79,8 +79,8 @@ public class BusinessException extends RuntimeException {
      * @param errorCode 错误码枚举
      * @return BusinessException实例
      */
-    public static BusinessException of(ErrorCode errorCode) {
-        return new BusinessException(errorCode);
+    public static BusinessException of(ErrorCode errorCode) { // 静态工厂，更简洁
+        return new BusinessException(errorCode); // 委托单参构造
     }
 
     /**
@@ -91,8 +91,8 @@ public class BusinessException extends RuntimeException {
      * @param detail    详细错误信息
      * @return BusinessException实例
      */
-    public static BusinessException of(ErrorCode errorCode, String detail) {
-        return new BusinessException(errorCode, detail);
+    public static BusinessException of(ErrorCode errorCode, String detail) { // 静态工厂（带详情）
+        return new BusinessException(errorCode, detail); // 委托构造
     }
 
     /**
@@ -103,8 +103,8 @@ public class BusinessException extends RuntimeException {
      * @param cause     原始异常原因
      * @return BusinessException实例
      */
-    public static BusinessException of(ErrorCode errorCode, Throwable cause) {
-        return new BusinessException(errorCode, cause);
+    public static BusinessException of(ErrorCode errorCode, Throwable cause) { // 静态工厂（带原因）
+        return new BusinessException(errorCode, cause); // 委托构造
     }
 
     /**
@@ -115,11 +115,11 @@ public class BusinessException extends RuntimeException {
      * @param detail    详细错误信息
      * @return 拼接后的完整异常消息
      */
-    private static String buildMessage(ErrorCode errorCode, String detail) {
-        if (detail == null || detail.isEmpty()) {
-            return errorCode.getMessage();
+    private static String buildMessage(ErrorCode errorCode, String detail) { // 私有消息拼接方法
+        if (detail == null || detail.isEmpty()) { // 无详情
+            return errorCode.getMessage(); // 只用错误码默认消息
         }
-        return errorCode.getMessage() + ": " + detail;
+        return errorCode.getMessage() + ": " + detail; // 默认消息 + 冒号 + 详情
     }
 
     /**
@@ -128,7 +128,7 @@ public class BusinessException extends RuntimeException {
      *
      * @return 错误码数值
      */
-    public int getCode() {
-        return errorCode.getCode();
+    public int getCode() { // 便捷getter
+        return errorCode.getCode(); // 委托给错误码枚举
     }
-}
+} // BusinessException类结束

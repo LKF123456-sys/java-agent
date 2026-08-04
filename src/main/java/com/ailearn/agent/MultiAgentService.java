@@ -722,110 +722,110 @@ public class MultiAgentService {
      * @param conversationId 会话ID字符串
      * @return Flux&lt;String&gt; SSE事件流，每个事件为JSON格式
      */
-    public Flux<String> streamCollaborativeExecute(String task, String conversationId) {
-        if (!StringUtils.hasText(task)) {
-            return Flux.just(createSseEvent("error", null, "任务内容不能为空"));
+    public Flux<String> streamCollaborativeExecute(String task, String conversationId) { // SSE流式协作核心方法（无会话管理的纯流程版）
+        if (!StringUtils.hasText(task)) { // 任务为空校验
+            return Flux.just(createSseEvent("error", null, "任务内容不能为空")); // 返回只含错误事件的流
         }
-        // 各Agent输出的累积缓冲区
-        StringBuilder planBuilder = new StringBuilder();
-        StringBuilder researchBuilder = new StringBuilder();
-        StringBuilder codeBuilder = new StringBuilder();
-        StringBuilder criticBuilder = new StringBuilder();
-        // 使用数组持有TaskRoute引用（lambda中不能修改局部变量，用数组绕过）
-        final TaskRoute[] routeHolder = new TaskRoute[1];
+        // 各Agent输出的累积缓冲区（流式token要累积成完整文本，供后续Agent引用和Executor整合）
+        StringBuilder planBuilder = new StringBuilder(); // Planner输出累积
+        StringBuilder researchBuilder = new StringBuilder(); // Researcher输出累积
+        StringBuilder codeBuilder = new StringBuilder(); // Coder输出累积
+        StringBuilder criticBuilder = new StringBuilder(); // Critic输出累积
+        // 使用数组持有TaskRoute引用（lambda中不能修改局部变量，用数组绕过Java闭包限制）
+        final TaskRoute[] routeHolder = new TaskRoute[1]; // 数组第一个元素存路由决策，供Flux.defer中使用
 
-        // 阶段1：Planner Agent流式输出
+        // 阶段1：Planner Agent流式输出（Flux.concat按顺序拼接：开始事件→token流→结束事件）
         Flux<String> plannerStream = Flux.concat(
-                Flux.just(createSseEvent("agent_start", "planner", "Planner Agent 开始任务规划...")),
-                streamPlannerAgent(task, conversationId)
-                        .map(token -> {
-                            planBuilder.append(token != null ? token : "");
-                            return createSseEvent("token", "planner", token);
+                Flux.just(createSseEvent("agent_start", "planner", "Planner Agent 开始任务规划...")), // 先推"开始"事件，前端显示Planner工作状态
+                streamPlannerAgent(task, conversationId) // 调用Planner流式方法，得到token流
+                        .map(token -> { // map：每个token到达时执行
+                            planBuilder.append(token != null ? token : ""); // 累积到缓冲区（防空指针）
+                            return createSseEvent("token", "planner", token); // 包装成token事件推给前端
                         })
-                        .onErrorResume(e -> Flux.just(createSseEvent("error", "planner", e.getMessage()))),
-                Flux.just(createSseEvent("agent_end", "planner", ""))
+                        .onErrorResume(e -> Flux.just(createSseEvent("error", "planner", e.getMessage()))), // Planner出错时降级为错误事件，不中断整个流程
+                Flux.just(createSseEvent("agent_end", "planner", "")) // 最后推"结束"事件，前端关闭Planner状态
         );
 
-        // 阶段2：根据路由决策动态执行后续Agent
-        Flux<String> dynamicRouteStream = Flux.defer(() -> {
-            TaskRoute route = parseTaskRoute(planBuilder.toString(), task);
-            routeHolder[0] = route;
-            if ("simple".equals(route.complexity) && !route.needResearch && !route.needCoder) {
-                return Flux.just(createSseEvent("info", null, "简单任务，跳过Researcher和Coder，直接生成回答..."));
+        // 阶段2：根据路由决策动态执行后续Agent（Flux.defer延迟执行：等阶段1的planBuilder填满后才解析路由）
+        Flux<String> dynamicRouteStream = Flux.defer(() -> { // defer关键！订阅时才执行，保证读到的是最新缓冲区内容
+            TaskRoute route = parseTaskRoute(planBuilder.toString(), task); // 解析Planner输出，得到路由决策
+            routeHolder[0] = route; // 存入数组，供阶段3的Executor使用
+            if ("simple".equals(route.complexity) && !route.needResearch && !route.needCoder) { // 简单任务短路
+                return Flux.just(createSseEvent("info", null, "简单任务，跳过Researcher和Coder，直接生成回答...")); // 只推提示事件，跳过中间Agent
             }
-            Flux<String> stream = Flux.empty();
-            if (route.needResearch) {
+            Flux<String> stream = Flux.empty(); // 初始化空流，后续按需拼接
+            if (route.needResearch) { // 需要信息收集时
                 Flux<String> researcherStream = Flux.concat(
-                        Flux.just(createSseEvent("agent_start", "researcher", "Researcher Agent 开始信息收集...")),
-                        streamResearcherAgent(task, conversationId)
-                                .map(token -> {
-                                    researchBuilder.append(token != null ? token : "");
-                                    return createSseEvent("token", "researcher", token);
+                        Flux.just(createSseEvent("agent_start", "researcher", "Researcher Agent 开始信息收集...")), // 开始事件
+                        streamResearcherAgent(task, conversationId) // Researcher流式调用（内部是同步+模拟流式）
+                                .map(token -> { // 每个token
+                                    researchBuilder.append(token != null ? token : ""); // 累积
+                                    return createSseEvent("token", "researcher", token); // 推token事件
                                 })
-                                .onErrorResume(e -> Flux.just(createSseEvent("error", "researcher", e.getMessage()))),
-                        Flux.just(createSseEvent("agent_end", "researcher", ""))
+                                .onErrorResume(e -> Flux.just(createSseEvent("error", "researcher", e.getMessage()))), // 出错降级
+                        Flux.just(createSseEvent("agent_end", "researcher", "")) // 结束事件
                 );
-                stream = Flux.concat(stream, researcherStream);
-            } else {
-                stream = Flux.concat(stream, Flux.just(createSseEvent("info", null, "无需信息收集，跳过Researcher...")));
+                stream = Flux.concat(stream, researcherStream); // 拼接到主流
+            } else { // 不需要信息收集
+                stream = Flux.concat(stream, Flux.just(createSseEvent("info", null, "无需信息收集，跳过Researcher..."))); // 推跳过提示
             }
-            if (route.needCoder) {
+            if (route.needCoder) { // 需要代码生成时
                 Flux<String> coderStream = Flux.concat(
-                        Flux.just(createSseEvent("agent_start", "coder", "Coder Agent 开始代码生成...")),
-                        streamCoderAgent(task, conversationId)
-                                .map(token -> {
-                                    codeBuilder.append(token != null ? token : "");
-                                    return createSseEvent("token", "coder", token);
+                        Flux.just(createSseEvent("agent_start", "coder", "Coder Agent 开始代码生成...")), // 开始事件
+                        streamCoderAgent(task, conversationId) // Coder流式调用
+                                .map(token -> { // 每个token
+                                    codeBuilder.append(token != null ? token : ""); // 累积代码
+                                    return createSseEvent("token", "coder", token); // 推token事件
                                 })
-                                .onErrorResume(e -> Flux.just(createSseEvent("error", "coder", e.getMessage()))),
-                        Flux.just(createSseEvent("agent_end", "coder", ""))
+                                .onErrorResume(e -> Flux.just(createSseEvent("error", "coder", e.getMessage()))), // 出错降级
+                        Flux.just(createSseEvent("agent_end", "coder", "")) // 结束事件
                 );
-                Flux<String> criticStream = runCriticIteration(planBuilder, researchBuilder, codeBuilder, criticBuilder, conversationId, 1);
-                stream = Flux.concat(stream, coderStream, criticStream);
-            } else if ("complex".equals(route.complexity)) {
-                Flux<String> criticOnlyStream = Flux.defer(() -> {
-                    criticBuilder.setLength(0);
-                    String criticInput = "规划结果：" + route.planContent + "\n\n研究结果：" + researchBuilder;
+                Flux<String> criticStream = runCriticIteration(planBuilder, researchBuilder, codeBuilder, criticBuilder, conversationId, 1); // Coder完成后启动Critic迭代审查（第1轮）
+                stream = Flux.concat(stream, coderStream, criticStream); // 拼接：先代码生成，再迭代审查
+            } else if ("complex".equals(route.complexity)) { // 不写代码但任务复杂：只对规划+研究结果做一次质量审查
+                Flux<String> criticOnlyStream = Flux.defer(() -> { // defer延迟到订阅时执行
+                    criticBuilder.setLength(0); // 清空Critic缓冲区（复用对象前先清零）
+                    String criticInput = "规划结果：" + route.planContent + "\n\n研究结果：" + researchBuilder; // 拼装审查输入
                     return Flux.concat(
-                            Flux.just(createSseEvent("agent_start", "critic", "Critic Agent 开始质量审查...")),
-                            streamCriticAgent(criticInput, conversationId + "_review")
-                                    .map(token -> {
-                                        criticBuilder.append(token != null ? token : "");
-                                        return createSseEvent("token", "critic", token);
+                            Flux.just(createSseEvent("agent_start", "critic", "Critic Agent 开始质量审查...")), // 开始事件
+                            streamCriticAgent(criticInput, conversationId + "_review") // Critic流式审查（会话ID加后缀隔离记忆）
+                                    .map(token -> { // 每个token
+                                        criticBuilder.append(token != null ? token : ""); // 累积审查意见
+                                        return createSseEvent("token", "critic", token); // 推token事件
                                     })
-                                    .onErrorResume(e -> Flux.just(createSseEvent("error", "critic", e.getMessage()))),
-                            Flux.just(createSseEvent("agent_end", "critic", "")),
-                            Flux.just(createSseEvent("info", null, "审查完成，进入最终整合阶段..."))
+                                    .onErrorResume(e -> Flux.just(createSseEvent("error", "critic", e.getMessage()))), // 出错降级
+                            Flux.just(createSseEvent("agent_end", "critic", "")), // 结束事件
+                            Flux.just(createSseEvent("info", null, "审查完成，进入最终整合阶段...")) // 推进入整合阶段的提示
                     );
                 });
-                stream = Flux.concat(stream, criticOnlyStream);
+                stream = Flux.concat(stream, criticOnlyStream); // 拼接到主流
             }
-            return stream;
+            return stream; // 返回动态路由阶段的事件流
         });
 
-        // 阶段3：Executor Agent整合所有结果
+        // 阶段3：Executor Agent整合所有结果（同样用defer确保读到最新的缓冲区内容）
         Flux<String> executorStream = Flux.defer(() -> {
-            TaskRoute route = routeHolder[0];
-            String planContent = (route != null ? route.planContent : planBuilder.toString());
-            String executorInput = task + "\n\n规划结果：" + (planContent != null ? planContent : "")
-                    + "\n\n研究结果：" + researchBuilder;
-            if (route != null && route.needCoder) {
-                executorInput += "\n\n最终代码结果：" + codeBuilder;
+            TaskRoute route = routeHolder[0]; // 取出路由决策
+            String planContent = (route != null ? route.planContent : planBuilder.toString()); // 优先用解析出的规划内容，否则用原始Planner输出
+            String executorInput = task + "\n\n规划结果：" + (planContent != null ? planContent : "") // 拼装Executor输入：原始任务+规划
+                    + "\n\n研究结果：" + researchBuilder; // +研究结果
+            if (route != null && route.needCoder) { // 如果做过代码生成
+                executorInput += "\n\n最终代码结果：" + codeBuilder; // +最终代码（含迭代修改后的版本）
             }
-            if (criticBuilder.length() > 0) {
-                executorInput += "\n\n审查意见：" + criticBuilder;
+            if (criticBuilder.length() > 0) { // 如果有审查意见
+                executorInput += "\n\n审查意见：" + criticBuilder; // +审查意见
             }
             return Flux.concat(
-                    Flux.just(createSseEvent("agent_start", "executor", "Executor Agent 开始整合最终结果...")),
-                    streamExecutorAgent(executorInput, conversationId)
-                            .map(token -> createSseEvent("token", "executor", token))
-                            .onErrorResume(e -> Flux.just(createSseEvent("error", "executor", e.getMessage()))),
-                    Flux.just(createSseEvent("agent_end", "executor", "")),
-                    Flux.just(createSseEvent("done", null, "所有Agent协作完成"))
+                    Flux.just(createSseEvent("agent_start", "executor", "Executor Agent 开始整合最终结果...")), // 开始事件
+                    streamExecutorAgent(executorInput, conversationId) // Executor流式整合
+                            .map(token -> createSseEvent("token", "executor", token)) // 包装token事件（Executor输出即最终答案，无需累积）
+                            .onErrorResume(e -> Flux.just(createSseEvent("error", "executor", e.getMessage()))), // 出错降级
+                    Flux.just(createSseEvent("agent_end", "executor", "")), // 结束事件
+                    Flux.just(createSseEvent("done", null, "所有Agent协作完成")) // 全流程done事件，前端收到后关闭连接
             );
         });
 
-        return Flux.concat(plannerStream, dynamicRouteStream, executorStream);
+        return Flux.concat(plannerStream, dynamicRouteStream, executorStream); // 三阶段按顺序拼接成完整SSE事件流
     }
 
     /**
@@ -840,65 +840,65 @@ public class MultiAgentService {
      * @param iteration       当前迭代轮次（从1开始）
      * @return Flux&lt;String&gt; 包含审查和可能的修改过程的SSE事件流
      */
-    private Flux<String> runCriticIteration(StringBuilder planBuilder,
+    private Flux<String> runCriticIteration(StringBuilder planBuilder, // 递归实现Critic迭代审查
                                             StringBuilder researchBuilder,
                                             StringBuilder codeBuilder,
                                             StringBuilder criticBuilder,
                                             String conversationId,
                                             int iteration) {
-        final String finalPrevCriticOutput = criticBuilder.toString();
-        criticBuilder.setLength(0);
+        final String finalPrevCriticOutput = criticBuilder.toString(); // 保存上一轮审查意见（final才能被lambda引用）
+        criticBuilder.setLength(0); // 清空缓冲区，准备接收本轮审查意见
 
-        String criticInput = "规划结果：" + planBuilder + "\n\n研究结果：" + researchBuilder
-                + "\n\n" + (iteration == 1 ? "代码结果" : "修改后的代码") + "：" + codeBuilder;
-        if (iteration > 1) {
+        String criticInput = "规划结果：" + planBuilder + "\n\n研究结果：" + researchBuilder // 拼装审查输入：规划+研究
+                + "\n\n" + (iteration == 1 ? "代码结果" : "修改后的代码") + "：" + codeBuilder; // 第1轮叫"代码结果"，后续轮叫"修改后的代码"
+        if (iteration > 1) { // 第2轮起，附上上一轮审查意见（让Critic知道之前提了什么问题、是否已修复）
             criticInput += "\n\n上一轮审查意见：" + finalPrevCriticOutput;
         }
 
-        String agentName = iteration == 1 ? "critic" : "critic_review" + iteration;
-        String startMsg = iteration == 1
+        String agentName = iteration == 1 ? "critic" : "critic_review" + iteration; // 第1轮叫critic，后续轮加轮次后缀（前端区分显示）
+        String startMsg = iteration == 1 // 开始消息也按轮次区分
                 ? "Critic Agent 开始质量审查..."
                 : "Critic Agent 第" + iteration + "轮审查...";
 
-        Flux<String> reviewStream = Flux.concat(
-                Flux.just(createSseEvent("agent_start", agentName, startMsg)),
-                streamCriticAgent(criticInput, conversationId + "_iter" + iteration)
-                        .map(token -> {
-                            criticBuilder.append(token != null ? token : "");
-                            return createSseEvent("token", agentName, token);
+        Flux<String> reviewStream = Flux.concat( // 拼接本轮审查的事件流
+                Flux.just(createSseEvent("agent_start", agentName, startMsg)), // 开始事件
+                streamCriticAgent(criticInput, conversationId + "_iter" + iteration) // Critic流式审查（会话ID加轮次后缀隔离记忆）
+                        .map(token -> { // 每个token
+                            criticBuilder.append(token != null ? token : ""); // 累积审查意见
+                            return createSseEvent("token", agentName, token); // 推token事件
                         })
-                        .onErrorResume(e -> Flux.just(createSseEvent("error", agentName, e.getMessage()))),
-                Flux.just(createSseEvent("agent_end", agentName, ""))
+                        .onErrorResume(e -> Flux.just(createSseEvent("error", agentName, e.getMessage()))), // 出错降级
+                Flux.just(createSseEvent("agent_end", agentName, "")) // 结束事件
         );
 
-        return reviewStream.thenMany(Flux.defer(() -> {
-            String criticOutput = criticBuilder.toString();
-            boolean passed = criticOutput.contains("【审查结果：通过】")
+        return reviewStream.thenMany(Flux.defer(() -> { // thenMany：等审查流全部发完后，再决定下一步（defer延迟判断）
+            String criticOutput = criticBuilder.toString(); // 取出本轮完整审查意见
+            boolean passed = criticOutput.contains("【审查结果：通过】") // 判断是否通过：匹配两种格式（带括号和不带括号，提高容错）
                     || criticOutput.contains("审查结果：通过");
-            if (passed || iteration >= MAX_CRITIC_ITERATIONS) {
-                String infoMsg = passed
-                        ? "审查通过，进入最终整合阶段..."
-                        : "已达最大迭代次数(" + MAX_CRITIC_ITERATIONS + "轮)，进入最终整合阶段...";
-                return Flux.just(createSseEvent("info", null, infoMsg));
+            if (passed || iteration >= MAX_CRITIC_ITERATIONS) { // 终止条件：通过 或 达到最大迭代次数（防无限循环）
+                String infoMsg = passed // 根据不同终止原因生成不同提示
+                        ? "审查通过，进入最终整合阶段..." // 审查通过
+                        : "已达最大迭代次数(" + MAX_CRITIC_ITERATIONS + "轮)，进入最终整合阶段..."; // 达到上限
+                return Flux.just(createSseEvent("info", null, infoMsg)); // 推提示事件，迭代结束
             }
-            String originalCode = codeBuilder.toString();
-            codeBuilder.setLength(0);
-            String reviseAgentName = "coder_revise" + iteration;
-            Flux<String> reviseStream = Flux.concat(
-                    Flux.just(createSseEvent("info", null, "审查未通过，开始第" + (iteration + 1) + "轮修改...")),
-                    Flux.just(createSseEvent("agent_start", reviseAgentName,
+            String originalCode = codeBuilder.toString(); // 未通过：保存当前代码作为"原始代码"供修改
+            codeBuilder.setLength(0); // 清空代码缓冲区，准备接收修改后的代码
+            String reviseAgentName = "coder_revise" + iteration; // 修改Agent名称带轮次（前端区分）
+            Flux<String> reviseStream = Flux.concat( // 拼接代码修改的事件流
+                    Flux.just(createSseEvent("info", null, "审查未通过，开始第" + (iteration + 1) + "轮修改...")), // 提示即将修改
+                    Flux.just(createSseEvent("agent_start", reviseAgentName, // 修改开始事件
                             "Coder Agent 根据审查意见修改代码（第" + iteration + "轮）...")),
-                    streamCoderReviseAgent(originalCode, criticOutput, conversationId, iteration)
-                            .map(token -> {
-                                codeBuilder.append(token != null ? token : "");
-                                return createSseEvent("token", reviseAgentName, token);
+                    streamCoderReviseAgent(originalCode, criticOutput, conversationId, iteration) // 调用修改Agent：传入原代码+审查意见
+                            .map(token -> { // 每个token
+                                codeBuilder.append(token != null ? token : ""); // 累积修改后的代码
+                                return createSseEvent("token", reviseAgentName, token); // 推token事件
                             })
-                            .onErrorResume(e -> Flux.just(createSseEvent("error", reviseAgentName, e.getMessage()))),
-                    Flux.just(createSseEvent("agent_end", reviseAgentName, ""))
+                            .onErrorResume(e -> Flux.just(createSseEvent("error", reviseAgentName, e.getMessage()))), // 出错降级
+                    Flux.just(createSseEvent("agent_end", reviseAgentName, "")) // 修改结束事件
             );
-            return Flux.concat(
+            return Flux.concat( // 拼接：修改流 + 下一轮审查（递归！）
                     reviseStream,
-                    runCriticIteration(planBuilder, researchBuilder, codeBuilder, criticBuilder, conversationId, iteration + 1)
+                    runCriticIteration(planBuilder, researchBuilder, codeBuilder, criticBuilder, conversationId, iteration + 1) // 递归调用自己，轮次+1
             );
         }));
     }
@@ -914,65 +914,65 @@ public class MultiAgentService {
      * @return Flux&lt;String&gt; SSE事件流
      * @throws BusinessException 任务为空或会话不存在时抛出
      */
-    public Flux<String> streamCollaborativeExecute(AgentChatRequest req, UserPrincipal user) {
-        Long userId = user.getUserId();
-        String task = req.getTask();
-        if (!StringUtils.hasText(task)) {
+    public Flux<String> streamCollaborativeExecute(AgentChatRequest req, UserPrincipal user) { // 带会话管理的SSE入口（Controller调用这个）
+        Long userId = user.getUserId(); // 取出用户ID
+        String task = req.getTask(); // 取出任务描述
+        if (!StringUtils.hasText(task)) { // 任务为空抛业务异常
             throw new BusinessException(ErrorCode.CHAT_MESSAGE_EMPTY);
         }
-        Long conversationId = req.getConversationId();
-        String convIdStr;
-        if (conversationId == null) {
-            Conversation conversation = conversationService.createConversation(
+        Long conversationId = req.getConversationId(); // 取出会话ID（可能为null）
+        String convIdStr; // 声明字符串形式的会话ID（记忆隔离用）
+        if (conversationId == null) { // 情况1：未传会话ID，自动创建
+            Conversation conversation = conversationService.createConversation( // 创建multi-agent类型的新会话
                     userId,
-                    task.length() > 50 ? task.substring(0, 50) + "..." : task,
+                    task.length() > 50 ? task.substring(0, 50) + "..." : task, // 标题取任务前50字符
                     "multi-agent"
             );
-            conversationId = conversation.getId();
-            convIdStr = String.valueOf(conversationId);
-            req.setConversationId(conversationId);
-        } else {
-            convIdStr = String.valueOf(conversationId);
-            Conversation existing = conversationService.getConversationById(userId, conversationId);
-            if (existing == null) {
+            conversationId = conversation.getId(); // 拿到新会话ID
+            convIdStr = String.valueOf(conversationId); // 转字符串
+            req.setConversationId(conversationId); // 回填到请求对象
+        } else { // 情况2：传了会话ID，验证归属权
+            convIdStr = String.valueOf(conversationId); // 转字符串
+            Conversation existing = conversationService.getConversationById(userId, conversationId); // 按用户+会话ID查询
+            if (existing == null) { // 不存在或不属于当前用户
                 throw new BusinessException(ErrorCode.CHAT_CONVERSATION_NOT_FOUND);
             }
         }
-        conversationService.saveMessage(userId, conversationId, "user", task);
-        Long finalConversationId = conversationId;
-        final Long uid = userId;
-        StringBuilder fullResponseBuilder = new StringBuilder();
-        String initEvent = createSseEvent("init", null, String.valueOf(finalConversationId));
+        conversationService.saveMessage(userId, conversationId, "user", task); // 保存用户消息到数据库
+        Long finalConversationId = conversationId; // 有效final变量供lambda使用
+        final Long uid = userId; // 用户ID的final副本
+        StringBuilder fullResponseBuilder = new StringBuilder(); // 完整响应累积缓冲区（存库用）
+        String initEvent = createSseEvent("init", null, String.valueOf(finalConversationId)); // init事件：把会话ID第一时间推给前端（前端后续对话要用）
 
-        return Flux.just(initEvent)
-                .concatWith(streamCollaborativeExecute(task, convIdStr)
-                        .doOnNext(event -> {
+        return Flux.just(initEvent) // 先发init事件
+                .concatWith(streamCollaborativeExecute(task, convIdStr) // 再拼接核心协作流
+                        .doOnNext(event -> { // 每个事件经过时：解析JSON提取token累积完整响应
                             try {
-                                Map<String, String> evt = objectMapper.readValue(event, new TypeReference<Map<String, String>>() {});
-                                String type = evt.get("type");
-                                if ("token".equals(type) && evt.get("content") != null) {
-                                    fullResponseBuilder.append(evt.get("content"));
+                                Map<String, String> evt = objectMapper.readValue(event, new TypeReference<Map<String, String>>() {}); // 把事件JSON反序列化为Map
+                                String type = evt.get("type"); // 取事件类型
+                                if ("token".equals(type) && evt.get("content") != null) { // 只累积token事件的内容
+                                    fullResponseBuilder.append(evt.get("content")); // 追加到缓冲区
                                 }
-                            } catch (Exception e) {
-                                log.warn("解析SSE事件失败: {}", e.getMessage());
+                            } catch (Exception e) { // 解析失败（不该发生，防御性处理）
+                                log.warn("解析SSE事件失败: {}", e.getMessage()); // 只记警告，不中断流
                             }
                         })
-                        .doOnComplete(() -> {
+                        .doOnComplete(() -> { // 流全部完成时：把累积的完整响应存库
                             try {
-                                String fullResponse = fullResponseBuilder.toString();
-                                if (StringUtils.hasText(fullResponse)) {
-                                    conversationService.saveMessage(uid, finalConversationId, "assistant", fullResponse);
+                                String fullResponse = fullResponseBuilder.toString(); // 取出完整响应
+                                if (StringUtils.hasText(fullResponse)) { // 非空才保存
+                                    conversationService.saveMessage(uid, finalConversationId, "assistant", fullResponse); // role="assistant"存AI回复
                                 }
-                            } catch (Exception e) {
-                                log.warn("保存多Agent协作消息失败: {}", e.getMessage());
+                            } catch (Exception e) { // 保存失败（如数据库连接断了）
+                                log.warn("保存多Agent协作消息失败: {}", e.getMessage()); // 只记警告（响应已推给前端，存库失败不影响用户体验）
                             }
                         })
-                        .doOnError(e -> log.error("多Agent流式协作失败", e))
-                        .onErrorResume(e -> {
-                            String errMsg = e.getMessage() != null ? e.getMessage() : "多Agent协作失败";
+                        .doOnError(e -> log.error("多Agent流式协作失败", e)) // 流出错时记录错误日志
+                        .onErrorResume(e -> { // 异常兜底：推错误事件+done事件，让前端正常收尾
+                            String errMsg = e.getMessage() != null ? e.getMessage() : "多Agent协作失败"; // 取异常消息
                             log.warn("多Agent流异常，发送错误事件: {}", errMsg);
-                            return Flux.just(createSseEvent("error", null, errMsg),
-                                    createSseEvent("done", null, "协作因错误终止"));
+                            return Flux.just(createSseEvent("error", null, errMsg), // 错误事件
+                                    createSseEvent("done", null, "协作因错误终止")); // done事件（前端收到后关闭连接）
                         }));
     }
 }

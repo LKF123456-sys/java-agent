@@ -1,13 +1,22 @@
-package com.ailearn.config;
+package com.ailearn.config; // 声明当前类所在的包：config（配置层）
 
+// 导入系统工具类（时间查询、系统信息等）
 import com.ailearn.mcp.SystemTools;
+// 导入计算器工具类（数学表达式计算）
 import com.ailearn.tools.CalculatorTool;
+// 导入天气查询工具类（调用外部天气API）
 import com.ailearn.tools.WeatherTool;
+// 导入联网搜索工具类（Tavily搜索API）
 import com.ailearn.tools.WebSearchTool;
+// 导入Lombok日志注解，自动生成log对象
 import lombok.extern.slf4j.Slf4j;
+// 导入工具回调提供者接口，Spring AI工具体系的核心抽象（AgentService/MultiAgentService都靠它拿工具）
 import org.springframework.ai.tool.ToolCallbackProvider;
+// 导入基于方法的工具回调提供者实现，扫描@Tool注解的方法并包装成工具
 import org.springframework.ai.tool.method.MethodToolCallbackProvider;
+// 导入@Bean注解，把方法返回值注册为Spring Bean
 import org.springframework.context.annotation.Bean;
+// 导入@Configuration注解，标记这是配置类
 import org.springframework.context.annotation.Configuration;
 
 /**
@@ -27,9 +36,9 @@ import org.springframework.context.annotation.Configuration;
  *
  * @author AiLearn Platform
  */
-@Slf4j
-@Configuration
-public class McpServerConfig {
+@Slf4j // Lombok注解：自动生成log日志对象
+@Configuration // 标记为Spring配置类，启动时被扫描并执行@Bean方法
+public class McpServerConfig { // 定义MCP服务器配置类
 
     /**
      * 创建ToolCallbackProvider Bean
@@ -48,17 +57,18 @@ public class McpServerConfig {
      * @param weatherTool    天气查询工具Bean，提供实时天气查询功能
      * @param calculatorTool 计算器工具Bean，提供数学表达式计算功能
      * @param systemTools    系统工具Bean，提供系统信息获取等功能
+     * @param webSearchTool  联网搜索工具Bean，提供Tavily联网搜索功能
      * @return ToolCallbackProvider 工具回调提供者，包含所有已注册的MCP工具
      */
-    @Bean
-    public ToolCallbackProvider toolCallbackProvider(
-            WeatherTool weatherTool,
-            CalculatorTool calculatorTool,
-            SystemTools systemTools,
-            WebSearchTool webSearchTool) {
-        log.info("注册MCP工具: WeatherTool(天气查询), CalculatorTool(计算器), SystemTools(系统工具), WebSearchTool(联网搜索)");
-        return MethodToolCallbackProvider.builder()
-                .toolObjects(weatherTool, calculatorTool, systemTools, webSearchTool)
-                .build();
+    @Bean // 把ToolCallbackProvider注册为Spring Bean（AgentService、MultiAgentService都会注入它来获取全部工具）
+    public ToolCallbackProvider toolCallbackProvider( // 方法参数由Spring容器自动注入对应的工具Bean
+            WeatherTool weatherTool, // 注入天气工具（@Component已声明为Bean）
+            CalculatorTool calculatorTool, // 注入计算器工具
+            SystemTools systemTools, // 注入系统工具
+            WebSearchTool webSearchTool) { // 注入联网搜索工具
+        log.info("注册MCP工具: WeatherTool(天气查询), CalculatorTool(计算器), SystemTools(系统工具), WebSearchTool(联网搜索)"); // 打印注册日志，启动时确认工具加载
+        return MethodToolCallbackProvider.builder() // 用构建器模式创建基于方法的工具提供者
+                .toolObjects(weatherTool, calculatorTool, systemTools, webSearchTool) // 传入4个工具对象：扫描它们所有@Tool注解的方法并注册（Spring AI 2.0中工具循环由ToolCallingAdvisor驱动）
+                .build(); // 构建完成，返回包含全部工具的Provider
     }
 }

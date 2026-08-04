@@ -1,12 +1,12 @@
-package com.ailearn.common;
+package com.ailearn.common; // 声明包名
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import org.slf4j.MDC;
+import lombok.AllArgsConstructor; // Lombok注解，生成全参构造器
+import lombok.Builder; // Lombok注解，生成建造者模式API
+import lombok.Data; // Lombok注解，生成getter/setter/toString/equals/hashCode
+import lombok.NoArgsConstructor; // Lombok注解，生成无参构造器
+import org.slf4j.MDC; // SLF4J的MDC（映射诊断上下文），用于日志链路追踪
 
-import java.io.Serializable;
+import java.io.Serializable; // 序列化接口
 
 /**
  * 统一API响应包装类
@@ -15,43 +15,43 @@ import java.io.Serializable;
  * @param <T> 响应数据的泛型类型
  * @author AiLearn Platform
  */
-@Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-public class Result<T> implements Serializable {
+@Data // 自动生成getter/setter等
+@Builder // 启用建造者模式（Result.<T>builder().code(..).build()）
+@NoArgsConstructor // 生成无参构造器
+@AllArgsConstructor // 生成全参构造器
+public class Result<T> implements Serializable { // 泛型类，实现Serializable支持序列化
 
-    private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 1L; // 序列化版本号
 
     /**
      * 响应状态码
      * 200表示成功，其他表示失败
      */
-    private int code;
+    private int code; // 业务状态码
 
     /**
      * 响应消息
      * 成功时为"success"，失败时为错误描述信息
      */
-    private String message;
+    private String message; // 响应消息文本
 
     /**
      * 响应数据
      * 泛型类型，用于携带具体的业务数据
      */
-    private T data;
+    private T data; // 泛型业务数据
 
     /**
      * 响应时间戳
      * 记录响应生成的时间（毫秒级时间戳）
      */
-    private long timestamp;
+    private long timestamp; // 毫秒时间戳
 
     /**
      * 链路追踪ID
      * 用于分布式追踪，从MDC中获取，方便日志排查问题
      */
-    private String traceId;
+    private String traceId; // 从MDC取的traceId
 
     /**
      * 创建成功响应（无数据）
@@ -60,8 +60,8 @@ public class Result<T> implements Serializable {
      * @param <T> 响应数据类型
      * @return 成功的Result对象
      */
-    public static <T> Result<T> success() {
-        return success(null);
+    public static <T> Result<T> success() { // 无数据成功响应
+        return success(null); // 委托给带数据的success方法，data传null
     }
 
     /**
@@ -72,14 +72,14 @@ public class Result<T> implements Serializable {
      * @param <T>  响应数据类型
      * @return 成功的Result对象
      */
-    public static <T> Result<T> success(T data) {
-        return Result.<T>builder()
-                .code(200)
-                .message("success")
-                .data(data)
-                .timestamp(System.currentTimeMillis())
-                .traceId(MDC.get("traceId"))
-                .build();
+    public static <T> Result<T> success(T data) { // 带数据的成功响应
+        return Result.<T>builder() // 启动建造者
+                .code(200) // 状态码200
+                .message("success") // 消息success
+                .data(data) // 业务数据
+                .timestamp(System.currentTimeMillis()) // 当前时间戳
+                .traceId(MDC.get("traceId")) // 从MDC取出当前请求的traceId
+                .build(); // 构建Result对象
     }
 
     /**
@@ -90,8 +90,8 @@ public class Result<T> implements Serializable {
      * @param <T>     响应数据类型
      * @return 错误的Result对象
      */
-    public static <T> Result<T> error(String message) {
-        return error(500, message);
+    public static <T> Result<T> error(String message) { // 仅消息的错误响应
+        return error(500, message); // 委托给带错误码的error方法，默认500
     }
 
     /**
@@ -103,14 +103,14 @@ public class Result<T> implements Serializable {
      * @param <T>     响应数据类型
      * @return 错误的Result对象
      */
-    public static <T> Result<T> error(int code, String message) {
-        return Result.<T>builder()
-                .code(code)
-                .message(message)
-                .data(null)
-                .timestamp(System.currentTimeMillis())
-                .traceId(MDC.get("traceId"))
-                .build();
+    public static <T> Result<T> error(int code, String message) { // 带码和消息的错误响应
+        return Result.<T>builder() // 启动建造者
+                .code(code) // 错误码
+                .message(message) // 错误消息
+                .data(null) // 错误响应无业务数据
+                .timestamp(System.currentTimeMillis()) // 时间戳
+                .traceId(MDC.get("traceId")) // traceId
+                .build(); // 构建
     }
 
     /**
@@ -121,8 +121,8 @@ public class Result<T> implements Serializable {
      * @param <T>       响应数据类型
      * @return 错误的Result对象
      */
-    public static <T> Result<T> error(ErrorCode errorCode) {
-        return error(errorCode.getCode(), errorCode.getMessage());
+    public static <T> Result<T> error(ErrorCode errorCode) { // 由枚举构造错误响应
+        return error(errorCode.getCode(), errorCode.getMessage()); // 取枚举的码和消息
     }
 
     /**
@@ -134,11 +134,11 @@ public class Result<T> implements Serializable {
      * @param <T>       响应数据类型
      * @return 错误的Result对象
      */
-    public static <T> Result<T> error(ErrorCode errorCode, String detail) {
-        String message = errorCode.getMessage();
-        if (detail != null && !detail.isEmpty()) {
-            message = message + ": " + detail;
+    public static <T> Result<T> error(ErrorCode errorCode, String detail) { // 枚举+详情
+        String message = errorCode.getMessage(); // 取默认消息
+        if (detail != null && !detail.isEmpty()) { // 有详情
+            message = message + ": " + detail; // 拼接详情
         }
-        return error(errorCode.getCode(), message);
+        return error(errorCode.getCode(), message); // 委托构造
     }
-}
+} // Result类结束

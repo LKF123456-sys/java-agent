@@ -295,30 +295,30 @@ public class AgentService {
      * @return 完整旅游计划文本
      * @throws BusinessException 目的地为空时抛出
      */
-    public String planTravel(String destination, int days) {
-        log.info("旅游规划开始: destination={}, days={}", destination, days);
+    public String planTravel(String destination, int days) { // 旅游规划示例场景（展示Agent组合调用多个工具的能力）
+        log.info("旅游规划开始: destination={}, days={}", destination, days); // 打印规划开始日志
         // 校验目的地不能为空
-        if (!StringUtils.hasText(destination)) {
-            throw new BusinessException(ErrorCode.SYSTEM_PARAM_VALIDATION_ERROR, "目的地不能为空");
+        if (!StringUtils.hasText(destination)) { // 目的地为null或空白字符串时
+            throw new BusinessException(ErrorCode.SYSTEM_PARAM_VALIDATION_ERROR, "目的地不能为空"); // 抛出参数校验错误
         }
         // 构建旅游规划提示词，包含天气查询、行程安排、费用估算和出行建议
-        String prompt = "请帮我规划 " + destination + " 的 " + days + " 天旅游计划。\n"
+        String prompt = "请帮我规划 " + destination + " 的 " + days + " 天旅游计划。\n" // 拼接目的地和天数
                 + "要求：\n"
-                + "1. 先查询目的地天气，根据天气推荐合适的活动\n"
-                + "2. 规划每天的行程安排\n"
-                + "3. 估算大概费用（住宿 400元/晚，餐饮 150元/天，景点 200元/天）\n"
-                + "4. 给出行前准备建议";
+                + "1. 先查询目的地天气，根据天气推荐合适的活动\n" // 引导Agent调用天气工具
+                + "2. 规划每天的行程安排\n" // 行程安排要求
+                + "3. 估算大概费用（住宿 400元/晚，餐饮 150元/天，景点 200元/天）\n" // 引导Agent调用计算器工具算费用
+                + "4. 给出行前准备建议"; // 出行建议要求
 
-        // 调用Agent客户端生成旅游计划，使用travel_前缀隔离记忆
-        String result = agentClient.prompt()
-                .user(prompt)
-                .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, "travel_" + destination))
-                .call()
-                .content();
+        // 调用Agent客户端生成旅游计划，使用travel_前缀隔离记忆（不同目的地的规划互不干扰）
+        String result = agentClient.prompt() // 构建AI调用
+                .user(prompt) // 设置拼装好的规划提示词
+                .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, "travel_" + destination)) // 记忆键为travel_+目的地
+                .call() // 同步调用（Agent内部可能多次调用天气/计算器工具，由ToolCallingAdvisor驱动循环）
+                .content(); // 取出完整计划文本
         // 记录结果长度日志
-        int len = result != null ? result.length() : 0;
-        log.info("旅游规划完成: destination={}, responseLength={}", destination, len);
-        return result != null ? result : "";
+        int len = result != null ? result.length() : 0; // 计算返回长度（防空指针）
+        log.info("旅游规划完成: destination={}, responseLength={}", destination, len); // 打印完成日志
+        return result != null ? result : ""; // 返回计划文本，null时降级为空串
     }
 
     /**
@@ -329,20 +329,20 @@ public class AgentService {
      * @return Agent的完整回复文本
      * @throws BusinessException 任务为空时抛出
      */
-    public String executeTask(String goal) {
-        log.info("通用任务执行开始: goal={}", goal != null ? goal.substring(0, Math.min(50, goal.length())) : "null");
-        if (!StringUtils.hasText(goal)) {
-            throw new BusinessException(ErrorCode.CHAT_MESSAGE_EMPTY);
+    public String executeTask(String goal) { // 通用任务同步执行（不创建数据库会话的轻量用法）
+        log.info("通用任务执行开始: goal={}", goal != null ? goal.substring(0, Math.min(50, goal.length())) : "null"); // 打印开始日志（截断前50字符）
+        if (!StringUtils.hasText(goal)) { // 任务为空校验
+            throw new BusinessException(ErrorCode.CHAT_MESSAGE_EMPTY); // 抛出"消息为空"业务异常
         }
-        // 调用Agent执行任务，使用task_前缀+hash值隔离记忆
-        String result = agentClient.prompt()
-                .user(goal)
-                .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, "task_" + Math.abs(goal.hashCode() % 10000)))
-                .call()
-                .content();
-        int len = result != null ? result.length() : 0;
-        log.info("通用任务执行完成: responseLength={}", len);
-        return result != null ? result : "";
+        // 调用Agent执行任务，使用task_前缀+hash值隔离记忆（相同任务内容共享记忆，不同任务互不干扰）
+        String result = agentClient.prompt() // 构建AI调用
+                .user(goal) // 设置任务目标
+                .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, "task_" + Math.abs(goal.hashCode() % 10000))) // hashCode取模10000再取绝对值，生成稳定的短记忆键
+                .call() // 同步调用
+                .content(); // 取出回复文本
+        int len = result != null ? result.length() : 0; // 计算回复长度（防空指针）
+        log.info("通用任务执行完成: responseLength={}", len); // 打印完成日志
+        return result != null ? result : ""; // 返回回复，null降级为空串
     }
 
     /**
@@ -353,22 +353,22 @@ public class AgentService {
      * @param conversationId 会话ID字符串
      * @return Flux&lt;String&gt; 流式token序列
      */
-    public Flux<String> streamTask(String goal, String conversationId) {
+    public Flux<String> streamTask(String goal, String conversationId) { // 通用任务流式执行（轻量用法）
         log.info("通用任务流式执行开始: conversationId={}, goal={}",
-                conversationId, goal != null ? goal.substring(0, Math.min(50, goal.length())) : "null");
-        // 任务为空时返回错误消息
+                conversationId, goal != null ? goal.substring(0, Math.min(50, goal.length())) : "null"); // 打印开始日志
+        // 任务为空时返回错误消息（流式接口用错误事件代替抛异常，防止前端断连）
         if (!StringUtils.hasText(goal)) {
-            return Flux.just("[ERROR] 任务内容不能为空");
+            return Flux.just("[ERROR] 任务内容不能为空"); // 返回只含一个错误消息的流
         }
         // 发起流式请求
-        return agentClient.prompt()
-                .user(goal)
-                .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, conversationId))
-                .stream()
-                .content()
+        return agentClient.prompt() // 构建AI调用
+                .user(goal) // 设置任务目标
+                .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, conversationId)) // 使用调用方传入的记忆会话ID
+                .stream() // 流式调用
+                .content() // 取出token流
                 // 流完成时记录日志
                 .doOnComplete(() -> log.info("通用任务流式执行完成: conversationId={}", conversationId))
-                // 流异常时记录错误日志
+                // 流异常时记录错误日志（不做onErrorResume，让全局异常处理接管）
                 .doOnError(e -> log.error("通用任务流式执行失败: conversationId={}, error={}",
                         conversationId, e.getMessage(), e));
     }
